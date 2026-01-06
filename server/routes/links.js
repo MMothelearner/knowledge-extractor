@@ -37,18 +37,36 @@ router.post('/submit', async (req, res) => {
     // 异步处理链接
     setImmediate(async () => {
       try {
+        // 第一步：获取链接内容
         const content = await LinkProcessor.fetchLinkContent(url);
-        const knowledge = LinkProcessor.extractKnowledgeFromWebpage(content.content);
+        
+        // 第二步：使用LLM分析内容
+        const llmAnalysis = await LinkProcessor.analyzeLinkWithLLM(content);
+        
+        // 第三步：从分析结果中提取知识点
+        const knowledge = [];
+        if (llmAnalysis.problems && Array.isArray(llmAnalysis.problems)) {
+          knowledge.push(...llmAnalysis.problems);
+        }
+        if (llmAnalysis.keyPoints && Array.isArray(llmAnalysis.keyPoints)) {
+          knowledge.push({
+            problem: '关键知识点',
+            methods: llmAnalysis.keyPoints
+          });
+        }
 
-        // 检测重复
+        // 第四步：检测重复
         const existingKnowledge = KnowledgePoint.findAll();
         const deduplicationResult = Deduplicator.detectDuplicates(knowledge, existingKnowledge);
 
-        // 更新链接
+        // 第五步：更新链接记录
         Link.update(link.id, {
+          title: content.title || link.title,
+          description: content.description || link.description,
           content: content.content,
           contentType: content.type,
           status: 'completed',
+          llmAnalysis: llmAnalysis,
           extractedKnowledge: {
             total: knowledge.length,
             new: deduplicationResult.new.length,
@@ -59,6 +77,7 @@ router.post('/submit', async (req, res) => {
           }
         });
       } catch (error) {
+        console.error('Error processing link:', error);
         Link.update(link.id, {
           status: 'failed',
           error: error.message
@@ -186,7 +205,7 @@ router.post('/:id/import-knowledge', (req, res) => {
               url: link.url,
               date: new Date().toISOString()
             }],
-            tags: ['imported']
+            tags: ['imported', link.contentType]
           });
           imported.push(point);
         }
@@ -197,6 +216,41 @@ router.post('/:id/import-knowledge', (req, res) => {
       success: true,
       data: imported,
       message: `${imported.length} knowledge points imported`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取链接处理统计
+ */
+router.get('/stats/summary', (req, res) => {
+  try {
+    const links = Link.findAll();
+    const stats = {
+      total: links.length,
+      completed: links.filter(l => l.status === 'completed').length,
+      processing: links.filter(l => l.status === 'processing').length,
+      failed: links.filter(l => l.status === 'failed').length,
+      byType: {}
+    };
+
+    // 按类型统计
+    links.forEach(link => {
+      const type = link.contentType || 'unknown';
+      if (!stats.byType[type]) {
+        stats.byType[type] = 0;
+      }
+      stats.byType[type]++;
+    });
+
+    res.json({
+      success: true,
+      data: stats
     });
   } catch (error) {
     res.status(500).json({
