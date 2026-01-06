@@ -2,6 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# 安装系统依赖（包括pdftotext）
+RUN apk add --no-cache poppler-utils
+
 # 复制package文件
 COPY package*.json ./
 
