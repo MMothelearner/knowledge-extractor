@@ -69,6 +69,10 @@ class Link {
     return this.loadAll();
   }
 
+  static getAll() {
+    return this.loadAll();
+  }
+
   static update(id, data) {
     const links = this.loadAll();
     const index = links.findIndex(l => l.id === id);

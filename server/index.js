@@ -26,6 +26,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(publicPath, 'index.html'));
 });
 
+// 仪表板路由
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(publicPath, 'dashboard.html'));
+});
+
 // API路由
 app.use('/api/knowledge-points', knowledgePointsRoutes);
 app.use('/api/documents', documentsRoutes);
@@ -39,6 +44,96 @@ app.get('/api/health', (req, res) => {
     message: 'Knowledge Extractor is running',
     timestamp: new Date().toISOString()
   });
+});
+
+// 获取所有文档
+app.get('/api/documents', (req, res) => {
+  try {
+    const Document = require('./models/Document');
+    const documents = Document.getAll();
+    res.json({
+      success: true,
+      data: documents
+    });
+  } catch (error) {
+    console.error('Error fetching documents:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 获取所有链接
+app.get('/api/links', (req, res) => {
+  try {
+    const Link = require('./models/Link');
+    const links = Link.getAll();
+    res.json({
+      success: true,
+      data: links
+    });
+  } catch (error) {
+    console.error('Error fetching links:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 获取所有知识点
+app.get('/api/knowledge-points', (req, res) => {
+  try {
+    const KnowledgePoint = require('./models/KnowledgePoint');
+    const knowledge = KnowledgePoint.getAll();
+    res.json({
+      success: true,
+      data: knowledge
+    });
+  } catch (error) {
+    console.error('Error fetching knowledge points:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 删除文档
+app.delete('/api/documents/:id', (req, res) => {
+  try {
+    const Document = require('./models/Document');
+    Document.delete(req.params.id);
+    res.json({
+      success: true,
+      message: 'Document deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 删除链接
+app.delete('/api/links/:id', (req, res) => {
+  try {
+    const Link = require('./models/Link');
+    Link.delete(req.params.id);
+    res.json({
+      success: true,
+      message: 'Link deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting link:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // 获取系统统计信息

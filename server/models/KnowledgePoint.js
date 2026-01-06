@@ -68,6 +68,10 @@ class KnowledgePoint {
     return this.loadAll();
   }
 
+  static getAll() {
+    return this.loadAll();
+  }
+
   static update(id, data) {
     const points = this.loadAll();
     const index = points.findIndex(p => p.id === id);

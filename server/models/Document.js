@@ -71,6 +71,10 @@ class Document {
     return this.loadAll();
   }
 
+  static getAll() {
+    return this.loadAll();
+  }
+
   static update(id, data) {
     const documents = this.loadAll();
     const index = documents.findIndex(d => d.id === id);
