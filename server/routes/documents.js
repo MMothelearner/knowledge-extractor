@@ -66,18 +66,25 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       status: 'processing'
     });
 
+    console.log(`[Documents] File uploaded: ${doc.id}, type: ${fileType}`);
+
     // 异步处理文档
-    setImmediate(async () => {
+    (async () => {
       try {
+        console.log(`[Documents] Processing document: ${doc.id}`);
         const processed = await DocumentProcessor.processDocument(req.file.path, fileType);
+        console.log(`[Documents] Text extracted: ${processed.text.length} characters`);
+        
         const knowledge = DocumentProcessor.extractKnowledge(processed.text);
+        console.log(`[Documents] Extracted ${knowledge.length} knowledge points`);
 
         // 检测重复
         const existingKnowledge = KnowledgePoint.findAll();
         const deduplicationResult = Deduplicator.detectDuplicates(knowledge, existingKnowledge);
+        console.log(`[Documents] Deduplication - new: ${deduplicationResult.new.length}, identical: ${deduplicationResult.identical.length}`);
 
         // 更新文档
-        Document.update(doc.id, {
+        const updated = Document.update(doc.id, {
           content: processed.text,
           status: 'completed',
           extractedKnowledge: {
@@ -89,13 +96,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             deduplicationResult: deduplicationResult
           }
         });
+        console.log(`[Documents] Document processing completed: ${doc.id}`);
       } catch (error) {
-        Document.update(doc.id, {
-          status: 'failed',
-          error: error.message
-        });
+        console.error(`[Documents] Processing error for ${doc.id}:`, error);
+        try {
+          Document.update(doc.id, {
+            status: 'failed',
+            error: error.message
+          });
+        } catch (updateError) {
+          console.error(`[Documents] Failed to update document status:`, updateError);
+        }
       }
-    });
+    })();
 
     res.status(201).json({
       success: true,
@@ -103,6 +116,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       message: 'Document uploaded and processing started'
     });
   } catch (error) {
+    console.error(`[Documents] Upload error:`, error);
     res.status(500).json({
       success: false,
       error: error.message
