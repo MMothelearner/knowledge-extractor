@@ -80,7 +80,7 @@ router.post('/text', async (req, res) => {
 
     console.log(`开始分析文本内容，长度: ${content.length}`);
 
-    const analysis = await processor.llmAnalyzer.analyzContent(content, contentType);
+    const analysis = await processor.llmAnalyzer.analyzeContent(content, contentType);
 
     res.json({
       success: true,

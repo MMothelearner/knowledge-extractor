@@ -25,7 +25,7 @@ class SmartDocumentProcessor {
       }
 
       // 2. 使用LLM进行智能分析
-      const analysis = await this.llmAnalyzer.analyzContent(content, 'document');
+      const analysis = await this.llmAnalyzer.analyzeContent(content, 'document');
 
       // 3. 返回结构化结果
       return {
@@ -80,11 +80,20 @@ class SmartDocumentProcessor {
    */
   async processLink(url) {
     try {
-      // 这里可以集成网页爬虫逻辑
-      // 暂时返回占位符
+      const LinkProcessor = require('./linkProcessor');
+      
+      // 1. 获取链接内容
+      const linkContent = await LinkProcessor.fetchLinkContent(url);
+      
+      // 2. 使用LLM分析链接内容
+      const analysis = await LinkProcessor.analyzeLinkWithLLM(linkContent);
+      
+      // 3. 返回结构化结果
       return {
         url: url,
-        content: '链接处理功能开发中',
+        title: linkContent.title || url,
+        contentType: linkContent.type,
+        analysis: analysis,
         processedAt: new Date().toISOString()
       };
     } catch (error) {
