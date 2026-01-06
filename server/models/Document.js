@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+
+// 简单的UUID生成方法 - 不依赖任何外部包
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
@@ -89,6 +91,21 @@ class Document {
     const documents = this.loadAll();
     const filtered = documents.filter(d => d.id !== id);
     this.saveAll(filtered);
+  }
+
+  static search(query) {
+    const documents = this.loadAll();
+    const lowerQuery = query.toLowerCase();
+    return documents.filter(d =>
+      d.title.toLowerCase().includes(lowerQuery) ||
+      d.description.toLowerCase().includes(lowerQuery) ||
+      d.content.toLowerCase().includes(lowerQuery)
+    );
+  }
+
+  static findByStatus(status) {
+    const documents = this.loadAll();
+    return documents.filter(d => d.status === status);
   }
 }
 
