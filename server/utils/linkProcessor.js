@@ -414,15 +414,23 @@ ${linkContent.content}
   "difficulty": "简单|中等|困难"
 }`;
 
-      const analysis = await LLMAnalyzer.analyze(prompt);
+      const analyzer = new LLMAnalyzer();
+      const analysis = await analyzer.analyzeContent(prompt, 'link');
       
       try {
-        return JSON.parse(analysis);
+        // 从分析结果中提取JSON
+        if (typeof analysis === 'string') {
+          return JSON.parse(analysis);
+        } else if (analysis && analysis.analysis) {
+          return JSON.parse(analysis.analysis);
+        } else {
+          return analysis;
+        }
       } catch (e) {
         // 如果JSON解析失败，返回原始文本
         return {
           title: linkContent.title,
-          summary: analysis,
+          summary: typeof analysis === 'string' ? analysis : JSON.stringify(analysis),
           keyPoints: [],
           problems: [],
           learningNotes: [],
@@ -432,7 +440,16 @@ ${linkContent.content}
       }
     } catch (error) {
       console.error('Error analyzing link with LLM:', error);
-      throw error;
+      // 返回默认分析结果而不是抛出错误
+      return {
+        title: linkContent.title,
+        summary: '内容分析中...',
+        keyPoints: [],
+        problems: [],
+        learningNotes: [],
+        tags: [],
+        difficulty: '中等'
+      };
     }
   }
 
