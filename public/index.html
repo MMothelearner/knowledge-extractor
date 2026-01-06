@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Knowledge Extractor - 知识提炼系统</title>
+    <title>Knowledge Extractor - 智能知识提炼系统</title>
     <style>
         * {
             margin: 0;
@@ -12,7 +12,7 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -32,6 +32,7 @@
         header h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
+            font-weight: 700;
         }
 
         header p {
@@ -39,7 +40,7 @@
             opacity: 0.9;
         }
 
-        .main-content {
+        .main-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
@@ -52,6 +53,7 @@
             padding: 30px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
         }
 
         .card:hover {
@@ -59,10 +61,15 @@
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
         }
 
-        .card h2 {
-            color: #333;
+        .card-icon {
+            font-size: 3em;
             margin-bottom: 15px;
+        }
+
+        .card h2 {
             font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #333;
         }
 
         .card p {
@@ -71,51 +78,37 @@
             margin-bottom: 20px;
         }
 
-        .card-icon {
-            font-size: 3em;
-            margin-bottom: 15px;
-        }
-
         .btn {
             display: inline-block;
-            padding: 12px 24px;
+            padding: 10px 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             text-decoration: none;
-            border-radius: 8px;
+            border-radius: 6px;
+            transition: opacity 0.3s;
             border: none;
             cursor: pointer;
             font-size: 1em;
-            transition: transform 0.2s;
         }
 
         .btn:hover {
-            transform: scale(1.05);
-        }
-
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-
-        .btn-secondary:hover {
-            background: #e0e0e0;
+            opacity: 0.9;
         }
 
         .stats {
             background: white;
             border-radius: 12px;
             padding: 30px;
-            margin-bottom: 40px;
+            margin-top: 40px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         }
 
-        .stats h2 {
-            color: #333;
+        .stats h3 {
             margin-bottom: 20px;
+            color: #333;
         }
 
-        .stats-grid {
+        .stat-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 20px;
@@ -124,7 +117,7 @@
         .stat-item {
             text-align: center;
             padding: 20px;
-            background: #f9f9f9;
+            background: #f5f5f5;
             border-radius: 8px;
         }
 
@@ -132,25 +125,46 @@
             font-size: 2em;
             font-weight: bold;
             color: #667eea;
+            margin-bottom: 10px;
         }
 
         .stat-label {
             color: #666;
-            margin-top: 10px;
+            font-size: 0.9em;
         }
 
-        .section {
-            background: white;
-            border-radius: 12px;
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
             padding: 30px;
-            margin-bottom: 40px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
         }
 
-        .section h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 1.5em;
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
         }
 
         .form-group {
@@ -167,9 +181,9 @@
         .form-group input,
         .form-group textarea {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             border: 1px solid #ddd;
-            border-radius: 8px;
+            border-radius: 6px;
             font-family: inherit;
             font-size: 1em;
         }
@@ -179,129 +193,198 @@
             min-height: 100px;
         }
 
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .message {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+        .loading {
             display: none;
-        }
-
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-            display: block;
-        }
-
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            display: block;
-        }
-
-        footer {
             text-align: center;
-            color: white;
             padding: 20px;
-            opacity: 0.8;
         }
 
-        @media (max-width: 768px) {
-            header h1 {
-                font-size: 1.8em;
-            }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
 
-            .main-content {
-                grid-template-columns: 1fr;
-            }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .result pre {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .success {
+            color: #28a745;
+        }
+
+        .error {
+            color: #dc3545;
+        }
+
+        .mindmap-container {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .mindmap-container pre {
+            font-size: 0.85em;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>📚 Knowledge Extractor</h1>
-            <p>知识提炼和整理平台</p>
+            <h1>🧠 Knowledge Extractor</h1>
+            <p>智能知识提炼和组织系统</p>
         </header>
 
-        <div class="stats" id="stats">
-            <h2>系统统计</h2>
-            <div class="stats-grid">
+        <div class="main-grid">
+            <div class="card" onclick="openModal('uploadModal')">
+                <div class="card-icon">📄</div>
+                <h2>上传文档</h2>
+                <p>上传PDF、Word或文本文件，系统自动提炼核心知识</p>
+                <button class="btn">开始上传</button>
+            </div>
+
+            <div class="card" onclick="openModal('textModal')">
+                <div class="card-icon">✍️</div>
+                <h2>分析文本</h2>
+                <p>粘贴文本内容，系统快速识别问题和解决方法</p>
+                <button class="btn">开始分析</button>
+            </div>
+
+            <div class="card" onclick="openModal('linkModal')">
+                <div class="card-icon">🔗</div>
+                <h2>处理链接</h2>
+                <p>提交网页或视频链接，自动提取和分析内容</p>
+                <button class="btn">提交链接</button>
+            </div>
+        </div>
+
+        <div class="stats" id="statsContainer">
+            <h3>系统统计</h3>
+            <div class="stat-grid">
                 <div class="stat-item">
                     <div class="stat-number" id="knowledgeCount">0</div>
                     <div class="stat-label">知识点</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-number" id="documentCount">0</div>
-                    <div class="stat-label">文档</div>
+                    <div class="stat-label">已处理文档</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-number" id="linkCount">0</div>
-                    <div class="stat-label">链接</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number" id="processingCount">0</div>
-                    <div class="stat-label">处理中</div>
+                    <div class="stat-label">已处理链接</div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="main-content">
-            <div class="card">
-                <div class="card-icon">📤</div>
-                <h2>上传文档</h2>
-                <p>上传PDF、Word、图片等文档，系统自动提炼知识点。</p>
-                <a href="/upload.html" class="btn">上传文档</a>
+    <!-- 上传文档模态框 -->
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('uploadModal')">&times;</span>
+            <h2>上传文档</h2>
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label for="file">选择文件 (PDF, TXT, MD)</label>
+                    <input type="file" id="file" accept=".pdf,.txt,.md" required>
+                </div>
+                <button type="submit" class="btn">上传并分析</button>
+            </form>
+            <div class="loading" id="uploadLoading">
+                <div class="spinner"></div>
+                <p>正在处理文件...</p>
             </div>
-
-            <div class="card">
-                <div class="card-icon">🔗</div>
-                <h2>提交链接</h2>
-                <p>提交网页或视频链接，系统自动提取内容并提炼知识。</p>
-                <a href="/links.html" class="btn">提交链接</a>
-            </div>
-
-            <div class="card">
-                <div class="card-icon">💡</div>
-                <h2>知识库</h2>
-                <p>查看、管理和搜索所有提炼的知识点。</p>
-                <a href="/knowledge.html" class="btn">查看知识库</a>
-            </div>
+            <div class="result" id="uploadResult"></div>
         </div>
+    </div>
 
-        <div class="section">
-            <h2>快速开始</h2>
-            <p>Knowledge Extractor 是一个知识提炼和整理平台，帮助您：</p>
-            <ul style="margin-left: 20px; margin-top: 15px; line-height: 2;">
-                <li>📄 上传各种格式的文档（PDF、Word、图片等）</li>
-                <li>🌐 提交网页和视频链接</li>
-                <li>🔍 自动提炼问题和解决方法</li>
-                <li>🎯 智能去重和关联识别</li>
-                <li>📊 导出为多种格式（Markdown、JSON、CSV、HTML）</li>
-            </ul>
+    <!-- 分析文本模态框 -->
+    <div id="textModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('textModal')">&times;</span>
+            <h2>分析文本</h2>
+            <form id="textForm">
+                <div class="form-group">
+                    <label for="textContent">输入文本内容</label>
+                    <textarea id="textContent" required placeholder="粘贴您要分析的文本..."></textarea>
+                </div>
+                <button type="submit" class="btn">开始分析</button>
+            </form>
+            <div class="loading" id="textLoading">
+                <div class="spinner"></div>
+                <p>正在分析文本...</p>
+            </div>
+            <div class="result" id="textResult"></div>
         </div>
+    </div>
 
-        <footer>
-            <p>&copy; 2024 Knowledge Extractor. All rights reserved.</p>
-        </footer>
+    <!-- 处理链接模态框 -->
+    <div id="linkModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('linkModal')">&times;</span>
+            <h2>处理链接</h2>
+            <form id="linkForm">
+                <div class="form-group">
+                    <label for="linkUrl">输入链接地址</label>
+                    <input type="url" id="linkUrl" required placeholder="https://example.com">
+                </div>
+                <button type="submit" class="btn">处理链接</button>
+            </form>
+            <div class="loading" id="linkLoading">
+                <div class="spinner"></div>
+                <p>正在处理链接...</p>
+            </div>
+            <div class="result" id="linkResult"></div>
+        </div>
     </div>
 
     <script>
-        // 加载系统统计信息
+        // 模态框控制
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        // 加载统计信息
         async function loadStats() {
             try {
                 const response = await fetch('/api/stats');
@@ -310,18 +393,161 @@
                     document.getElementById('knowledgeCount').textContent = data.stats.knowledgePoints;
                     document.getElementById('documentCount').textContent = data.stats.documents;
                     document.getElementById('linkCount').textContent = data.stats.links;
-                    document.getElementById('processingCount').textContent = 
-                        data.stats.documentsProcessing + data.stats.linksProcessing;
                 }
             } catch (error) {
-                console.error('Error loading stats:', error);
+                console.error('Failed to load stats:', error);
             }
         }
 
+        // 上传文档
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = document.getElementById('file').files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            document.getElementById('uploadLoading').style.display = 'block';
+            document.getElementById('uploadResult').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/smart-analysis/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                document.getElementById('uploadLoading').style.display = 'none';
+
+                if (data.success) {
+                    displayResult('uploadResult', data.data);
+                    loadStats();
+                } else {
+                    displayError('uploadResult', data.error);
+                }
+            } catch (error) {
+                document.getElementById('uploadLoading').style.display = 'none';
+                displayError('uploadResult', error.message);
+            }
+        });
+
+        // 分析文本
+        document.getElementById('textForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const content = document.getElementById('textContent').value;
+
+            document.getElementById('textLoading').style.display = 'block';
+            document.getElementById('textResult').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/smart-analysis/text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, contentType: 'text' })
+                });
+                const data = await response.json();
+
+                document.getElementById('textLoading').style.display = 'none';
+
+                if (data.success) {
+                    displayResult('textResult', data.data);
+                } else {
+                    displayError('textResult', data.error);
+                }
+            } catch (error) {
+                document.getElementById('textLoading').style.display = 'none';
+                displayError('textResult', error.message);
+            }
+        });
+
+        // 处理链接
+        document.getElementById('linkForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('linkUrl').value;
+
+            document.getElementById('linkLoading').style.display = 'block';
+            document.getElementById('linkResult').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/smart-analysis/link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                const data = await response.json();
+
+                document.getElementById('linkLoading').style.display = 'none';
+
+                if (data.success) {
+                    displayResult('linkResult', data.data);
+                    loadStats();
+                } else {
+                    displayError('linkResult', data.error);
+                }
+            } catch (error) {
+                document.getElementById('linkLoading').style.display = 'none';
+                displayError('linkResult', error.message);
+            }
+        });
+
+        // 显示结果
+        function displayResult(elementId, data) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            
+            let html = '<h4 class="success">✓ 分析成功</h4>';
+            
+            if (data.analysis) {
+                html += '<div style="margin-top: 15px;">';
+                html += `<p><strong>问题：</strong> ${data.analysis.problem || 'N/A'}</p>`;
+                
+                if (data.analysis.methods && data.analysis.methods.length > 0) {
+                    html += '<p><strong>解决方法：</strong></p><ul>';
+                    data.analysis.methods.forEach(m => {
+                        html += `<li>${m}</li>`;
+                    });
+                    html += '</ul>';
+                }
+                
+                if (data.analysis.keywords && data.analysis.keywords.length > 0) {
+                    html += '<p><strong>关键词：</strong> ' + data.analysis.keywords.join(', ') + '</p>';
+                }
+                
+                if (data.analysis.mindmap) {
+                    html += '<div class="mindmap-container"><strong>思维导图：</strong><pre>' + 
+                            escapeHtml(data.analysis.mindmap) + '</pre></div>';
+                }
+                
+                html += '</div>';
+            } else {
+                html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            }
+            
+            element.innerHTML = html;
+        }
+
+        // 显示错误
+        function displayError(elementId, error) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.innerHTML = `<h4 class="error">✗ 处理失败</h4><p>${error}</p>`;
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
         // 页面加载时获取统计信息
-        loadStats();
-        // 每30秒刷新一次统计信息
-        setInterval(loadStats, 30000);
+        window.addEventListener('load', loadStats);
     </script>
 </body>
 </html>

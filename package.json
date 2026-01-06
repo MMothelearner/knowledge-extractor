@@ -24,7 +24,8 @@
     "multer": "^2.0.2",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.530",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "node-fetch": "^2.6.11"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

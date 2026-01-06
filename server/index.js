@@ -7,6 +7,7 @@ const path = require('path');
 const knowledgePointsRoutes = require('./routes/knowledgePoints');
 const documentsRoutes = require('./routes/documents');
 const linksRoutes = require('./routes/links');
+const smartAnalysisRoutes = require('./routes/smartAnalysis');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +22,7 @@ app.use(express.static('public'));
 app.use('/api/knowledge-points', knowledgePointsRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/links', linksRoutes);
+app.use('/api/smart-analysis', smartAnalysisRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {
