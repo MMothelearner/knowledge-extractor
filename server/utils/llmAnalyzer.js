@@ -1,15 +1,37 @@
 /**
- * LLM分析器 - 集成Manus LLM服务
- * 使用Manus平台提供的LLM API进行内容分析
+ * LLM分析器 - 支持多个LLM提供商（DeepSeek、OpenAI等）
+ * 默认使用DeepSeek API
  */
 
 const fetch = require('node-fetch');
 
 class LLMAnalyzer {
   constructor() {
-    this.apiUrl = process.env.LLM_API_ENDPOINT || 'https://forge.manus.im/v1/chat/completions';
-    this.apiKey = process.env.LLM_API_KEY || process.env.MANUS_LLM_API_KEY;
-    this.model = 'gemini-2.5-flash';
+    // 支持多个LLM提供商
+    this.provider = process.env.LLM_PROVIDER || 'deepseek';
+    
+    if (this.provider === 'deepseek') {
+      this.apiUrl = 'https://api.deepseek.com/chat/completions';
+      this.model = 'deepseek-chat';
+    } else if (this.provider === 'openai') {
+      this.apiUrl = process.env.LLM_API_ENDPOINT || 'https://api.openai.com/v1/chat/completions';
+      this.model = process.env.LLM_MODEL || 'gpt-3.5-turbo';
+    } else if (this.provider === 'manus') {
+      this.apiUrl = 'https://api.manus.im/v1/chat/completions';
+      this.model = 'gemini-2.5-flash';
+    } else {
+      // 自定义提供商
+      this.apiUrl = process.env.LLM_API_ENDPOINT;
+      this.model = process.env.LLM_MODEL || 'default';
+    }
+    
+    this.apiKey = process.env.LLM_API_KEY;
+    
+    if (!this.apiKey) {
+      throw new Error(`LLM API Key not configured. Please set LLM_API_KEY environment variable for ${this.provider} provider.`);
+    }
+    
+    console.log(`LLM Analyzer initialized with provider: ${this.provider}, model: ${this.model}`);
   }
 
   /**
@@ -17,7 +39,7 @@ class LLMAnalyzer {
    */
   async invokeLLM(messages, responseFormat = null) {
     if (!this.apiKey) {
-      throw new Error('LLM API Key not configured. Please set MANUS_LLM_API_KEY environment variable.');
+      throw new Error(`LLM API Key not configured for ${this.provider}`);
     }
 
     const payload = {
@@ -27,7 +49,8 @@ class LLMAnalyzer {
       temperature: 0.7
     };
 
-    if (responseFormat) {
+    // 某些提供商可能不支持response_format
+    if (responseFormat && this.provider !== 'deepseek') {
       payload.response_format = responseFormat;
     }
 
@@ -60,8 +83,7 @@ class LLMAnalyzer {
   async analyzContent(content, contentType = 'text') {
     try {
       // 第一步：识别问题和方法
-      const analysisPrompt = `
-你是一个专业的知识提炼专家。请分析以下${contentType}内容，并按照要求输出结构化的知识。
+      const analysisPrompt = `你是一个专业的知识提炼专家。请分析以下${contentType}内容，并按照要求输出结构化的知识。
 
 内容：
 ${content}
@@ -78,12 +100,10 @@ ${content}
 1. problem字段必须简洁明确，不超过20个字
 2. methods数组中每个方法都要具体可操作，不要有废话
 3. keywords应该是最核心的3-5个关键词
-4. summary要精炼，不要冗长
-`;
+4. summary要精炼，不要冗长`;
 
       const analysisResponse = await this.invokeLLM(
-        [{ role: 'user', content: analysisPrompt }],
-        { type: 'json_object' }
+        [{ role: 'user', content: analysisPrompt }]
       );
 
       let analysis;
@@ -99,9 +119,13 @@ ${content}
         }
       }
 
+      // 验证必要字段
+      if (!analysis.problem || !analysis.methods || !analysis.keywords || !analysis.summary) {
+        throw new Error('Invalid analysis response: missing required fields');
+      }
+
       // 第二步：生成思维导图
-      const mindmapPrompt = `
-基于以下内容，生成一个Mermaid格式的思维导图：
+      const mindmapPrompt = `基于以下内容，生成一个Mermaid格式的思维导图：
 
 问题：${analysis.problem}
 方法：${analysis.methods.join('、')}
@@ -110,10 +134,9 @@ ${content}
 mindmap
   root((${analysis.problem}))
     方法
-      ${analysis.methods.map((m, i) => `方法${i + 1}\n        ${m}`).join('\n      ')}
+      ${analysis.methods.map((m, i) => `方法${i + 1}: ${m}`).join('\n      ')}
     关键点
-      ${analysis.keywords.map(k => `${k}`).join('\n      ')}
-`;
+      ${analysis.keywords.map(k => `${k}`).join('\n      ')}`;
 
       let mindmap = '';
       try {
@@ -122,6 +145,7 @@ mindmap
         mindmap = mindmap.replace(/```mermaid\n?/g, '').replace(/```\n?/g, '').trim();
       } catch (error) {
         console.warn('Failed to generate mindmap:', error);
+        // 使用默认格式
         mindmap = `mindmap
   root((${analysis.problem}))
     方法
@@ -150,8 +174,7 @@ ${analysis.keywords.map(k => `      ${k}`).join('\n')}`;
    */
   async detectSimilarity(content1, content2) {
     try {
-      const similarityPrompt = `
-请分析以下两段内容的相似度：
+      const similarityPrompt = `请分析以下两段内容的相似度：
 
 内容1：
 ${content1}
@@ -165,12 +188,10 @@ ${content2}
   "is_duplicate": true/false,
   "relationship": "完全相同" | "相似但不同" | "相同问题不同方法" | "完全不同",
   "explanation": "简短说明"
-}
-`;
+}`;
 
       const response = await this.invokeLLM(
-        [{ role: 'user', content: similarityPrompt }],
-        { type: 'json_object' }
+        [{ role: 'user', content: similarityPrompt }]
       );
 
       let result;

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const pdfParse = require('pdf-parse');
+const { execSync } = require('child_process');
 
 class DocumentProcessor {
   /**
@@ -34,12 +34,14 @@ class DocumentProcessor {
    */
   static async processPDF(filePath) {
     try {
-      const dataBuffer = fs.readFileSync(filePath);
-      const data = await pdfParse(dataBuffer);
+      const text = execSync(`pdftotext "${filePath}" -`, {
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024
+      });
       return {
-        text: data.text,
-        pages: data.numpages,
-        metadata: data.metadata
+        text: text,
+        pages: 1,
+        metadata: {}
       };
     } catch (error) {
       throw new Error(`Error parsing PDF: ${error.message}`);

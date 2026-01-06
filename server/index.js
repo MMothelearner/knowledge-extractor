@@ -16,7 +16,15 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+
+// 静态文件服务 - 必须在API路由之前
+const publicPath = path.join(__dirname, '../public');
+app.use(express.static(publicPath));
+
+// 首页路由 - 必须在API路由之前
+app.get('/', (req, res) => {
+  res.sendFile(path.join(publicPath, 'index.html'));
+});
 
 // API路由
 app.use('/api/knowledge-points', knowledgePointsRoutes);
@@ -81,6 +89,8 @@ app.use((err, req, res, next) => {
 
 // 启动服务器
 app.listen(PORT, () => {
-  console.log(`Knowledge Extractor is running on http://localhost:${PORT}`);
-  console.log(`API documentation: http://localhost:${PORT}/api/health`);
+  const actualPort = process.env.PORT || PORT;
+  console.log(`Knowledge Extractor is running on http://localhost:${actualPort}`);
+  console.log(`API documentation: http://localhost:${actualPort}/api/health`);
+  console.log(`Web interface: http://localhost:${actualPort}/`);
 });
