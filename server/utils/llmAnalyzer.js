@@ -73,7 +73,7 @@ class LLMAnalyzer {
   /**
    * 分析内容 - 识别问题和方法
    */
-  async analyzContent(content, contentType = 'text') {
+  async analyzeContent(content, contentType = 'text') {
     try {
       // 第一步：识别问题和方法
       const analysisPrompt = `你是一个专业的知识提炼专家。请分析以下${contentType}内容，并按照要求输出结构化的知识。

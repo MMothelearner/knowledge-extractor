@@ -491,38 +491,75 @@
             }
         });
 
-        // 显示结果
+        // 显示结果 - 改进版本
         function displayResult(elementId, data) {
             const element = document.getElementById(elementId);
             element.style.display = 'block';
             
             let html = '<h4 class="success">✓ 分析成功</h4>';
+            html += '<div style="margin-top: 15px;">';
             
-            if (data.analysis) {
-                html += '<div style="margin-top: 15px;">';
-                html += `<p><strong>问题：</strong> ${data.analysis.problem || 'N/A'}</p>`;
-                
-                if (data.analysis.methods && data.analysis.methods.length > 0) {
-                    html += '<p><strong>解决方法：</strong></p><ul>';
-                    data.analysis.methods.forEach(m => {
-                        html += `<li>${m}</li>`;
-                    });
-                    html += '</ul>';
-                }
-                
-                if (data.analysis.keywords && data.analysis.keywords.length > 0) {
-                    html += '<p><strong>关键词：</strong> ' + data.analysis.keywords.join(', ') + '</p>';
-                }
-                
-                if (data.analysis.mindmap) {
-                    html += '<div class="mindmap-container"><strong>思维导图：</strong><pre>' + 
-                            escapeHtml(data.analysis.mindmap) + '</pre></div>';
-                }
-                
-                html += '</div>';
-            } else {
-                html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            // 支持两种数据格式：新格式和旧格式
+            const analysis = data.analysis || data;
+            
+            // 标题
+            if (analysis.title) {
+                html += `<h3 style="color: #667eea; margin-bottom: 15px;">${escapeHtml(analysis.title)}</h3>`;
             }
+            
+            // 总结/摘要
+            if (analysis.summary) {
+                html += `<div style="background: #f0f4ff; padding: 12px; border-left: 4px solid #667eea; margin-bottom: 15px;">`;
+                html += `<strong>📝 内容总结：</strong><br/>${escapeHtml(analysis.summary)}`;
+                html += `</div>`;
+            }
+            
+            // 核心问题
+            if (analysis.problem) {
+                html += `<p style="margin-bottom: 10px;"><strong>❓ 核心问题：</strong> ${escapeHtml(analysis.problem)}</p>`;
+            } else if (analysis.problems && analysis.problems.length > 0) {
+                html += `<p style="margin-bottom: 10px;"><strong>❓ 核心问题：</strong> ${escapeHtml(analysis.problems[0].problem)}</p>`;
+            }
+            
+            // 解决方法/学习笔记
+            const methods = analysis.methods || (analysis.problems && analysis.problems[0] && analysis.problems[0].solutions) || analysis.learningNotes || [];
+            if (methods && methods.length > 0) {
+                html += '<p style="margin-bottom: 8px;"><strong>💡 解决方法/学习要点：</strong></p><ul style="margin-left: 20px; margin-bottom: 15px;">';
+                methods.forEach(m => {
+                    html += `<li style="margin-bottom: 5px;">${escapeHtml(m)}</li>`;
+                });
+                html += '</ul>';
+            }
+            
+            // 关键词/标签
+            const keywords = analysis.keywords || analysis.keyPoints || analysis.tags || [];
+            if (keywords && keywords.length > 0) {
+                html += '<p style="margin-bottom: 8px;"><strong>🏷️ 关键词/标签：</strong></p>';
+                html += '<div style="margin-bottom: 15px;">';
+                keywords.forEach(k => {
+                    html += `<span style="display: inline-block; background: #e8f0ff; color: #667eea; padding: 4px 12px; border-radius: 20px; margin-right: 8px; margin-bottom: 8px; font-size: 0.9em;">${escapeHtml(k)}</span>`;
+                });
+                html += '</div>';
+            }
+            
+            // 思维导图
+            if (analysis.mindmap) {
+                html += '<div class="mindmap-container" style="margin-top: 15px;"><strong>🧠 思维导图：</strong><pre style="font-size: 0.85em; background: #f9f9f9; padding: 10px; border-radius: 4px;">' + 
+                        escapeHtml(analysis.mindmap) + '</pre></div>';
+            }
+            
+            // 难度等级
+            if (analysis.difficulty) {
+                const difficultyEmoji = {
+                    '简单': '🟢',
+                    '中等': '🟡',
+                    '困难': '🔴'
+                };
+                const emoji = difficultyEmoji[analysis.difficulty] || '⚪';
+                html += `<p style="margin-top: 15px; color: #666;"><strong>难度等级：</strong> ${emoji} ${analysis.difficulty}</p>`;
+            }
+            
+            html += '</div>';
             
             element.innerHTML = html;
         }

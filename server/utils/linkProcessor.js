@@ -389,54 +389,35 @@ class LinkProcessor {
    */
   static async analyzeLinkWithLLM(linkContent) {
     try {
-      const prompt = `请分析以下内容，提取关键知识点、问题、解决方案和学习要点。
-
-内容标题: ${linkContent.title}
-内容描述: ${linkContent.description || '无'}
-内容类型: ${linkContent.type}
-
-主要内容:
-${linkContent.content}
-
-请按照以下格式返回JSON:
-{
-  "title": "主题标题",
-  "summary": "内容摘要",
-  "keyPoints": ["关键点1", "关键点2", ...],
-  "problems": [
-    {
-      "problem": "问题描述",
-      "solutions": ["解决方案1", "解决方案2", ...]
-    }
-  ],
-  "learningNotes": ["学习笔记1", "学习笔记2", ...],
-  "tags": ["标签1", "标签2", ...],
-  "difficulty": "简单|中等|困难"
-}`;
-
       const analyzer = new LLMAnalyzer();
-      const analysis = await analyzer.analyzeContent(prompt, 'link');
+      const analysis = await analyzer.analyzeContent(linkContent.content, 'link');
       
-      try {
-        // 从分析结果中提取JSON
-        if (typeof analysis === 'string') {
-          return JSON.parse(analysis);
-        } else if (analysis && analysis.analysis) {
-          return JSON.parse(analysis.analysis);
-        } else {
-          return analysis;
-        }
-      } catch (e) {
-        // 如果JSON解析失败，返回原始文本
-        return {
-          title: linkContent.title,
-          summary: typeof analysis === 'string' ? analysis : JSON.stringify(analysis),
-          keyPoints: [],
-          problems: [],
-          learningNotes: [],
-          tags: [],
-          difficulty: '中等'
-        };
+      // 返回LLM分析结果
+      // LLMAnalyzer 返回的格式:
+      // {
+      //   problem: "问题",
+      //   methods: ["方法1", "方法2"],
+      //   keywords: ["关键词1", "关键词2"],
+      //   summary: "总结",
+      //   mindmap: "思维导图",
+      //   contentType: "类型",
+      //   analyzedAt: "时间"
+      // }
+      
+      // 转换为前端期望的格式
+      return {
+        title: linkContent.title,
+        summary: analysis.summary || '',
+        keyPoints: analysis.keywords || [],
+        problems: analysis.problem ? [{
+          problem: analysis.problem,
+          solutions: analysis.methods || []
+        }] : [],
+        learningNotes: analysis.methods || [],
+        tags: analysis.keywords || [],
+        difficulty: '中等',
+        mindmap: analysis.mindmap || '',
+        rawAnalysis: analysis
       }
     } catch (error) {
       console.error('Error analyzing link with LLM:', error);
