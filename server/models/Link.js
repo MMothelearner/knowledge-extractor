@@ -1,13 +1,19 @@
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 const DATA_DIR = process.env.DATA_DIR || './data';
 const LINKS_FILE = path.join(DATA_DIR, 'links.json');
 
 class Link {
   constructor(data = {}) {
-    this.id = data.id || uuidv4();
+    this.id = data.id || generateUUID();
     this.url = data.url || '';
     this.title = data.title || '';
     this.description = data.description || '';

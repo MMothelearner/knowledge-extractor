@@ -1,13 +1,22 @@
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require('uuid/dist/index.js');
+// 或者使用简单的UUID生成方法
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+const uuid = uuidv4 || generateUUID;
 
 const DATA_DIR = process.env.DATA_DIR || './data';
 const KNOWLEDGE_POINTS_FILE = path.join(DATA_DIR, 'knowledge_points.json');
 
 class KnowledgePoint {
   constructor(data = {}) {
-    this.id = data.id || uuidv4();
+    this.id = data.id || uuid();
     this.problem = data.problem || '';
     this.methods = data.methods || [];
     this.sources = data.sources || [];
