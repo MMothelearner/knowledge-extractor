@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Extractor - 知识提炼系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .card-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .stats {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .stats h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1em;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 Knowledge Extractor</h1>
+            <p>知识提炼和整理平台</p>
+        </header>
+
+        <div class="stats" id="stats">
+            <h2>系统统计</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" id="knowledgeCount">0</div>
+                    <div class="stat-label">知识点</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="documentCount">0</div>
+                    <div class="stat-label">文档</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="linkCount">0</div>
+                    <div class="stat-label">链接</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="processingCount">0</div>
+                    <div class="stat-label">处理中</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <div class="card-icon">📤</div>
+                <h2>上传文档</h2>
+                <p>上传PDF、Word、图片等文档，系统自动提炼知识点。</p>
+                <a href="/upload.html" class="btn">上传文档</a>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">🔗</div>
+                <h2>提交链接</h2>
+                <p>提交网页或视频链接，系统自动提取内容并提炼知识。</p>
+                <a href="/links.html" class="btn">提交链接</a>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">💡</div>
+                <h2>知识库</h2>
+                <p>查看、管理和搜索所有提炼的知识点。</p>
+                <a href="/knowledge.html" class="btn">查看知识库</a>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>快速开始</h2>
+            <p>Knowledge Extractor 是一个知识提炼和整理平台，帮助您：</p>
+            <ul style="margin-left: 20px; margin-top: 15px; line-height: 2;">
+                <li>📄 上传各种格式的文档（PDF、Word、图片等）</li>
+                <li>🌐 提交网页和视频链接</li>
+                <li>🔍 自动提炼问题和解决方法</li>
+                <li>🎯 智能去重和关联识别</li>
+                <li>📊 导出为多种格式（Markdown、JSON、CSV、HTML）</li>
+            </ul>
+        </div>
+
+        <footer>
+            <p>&copy; 2024 Knowledge Extractor. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        // 加载系统统计信息
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('knowledgeCount').textContent = data.stats.knowledgePoints;
+                    document.getElementById('documentCount').textContent = data.stats.documents;
+                    document.getElementById('linkCount').textContent = data.stats.links;
+                    document.getElementById('processingCount').textContent = 
+                        data.stats.documentsProcessing + data.stats.linksProcessing;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // 页面加载时获取统计信息
+        loadStats();
+        // 每30秒刷新一次统计信息
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>

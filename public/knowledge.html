@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识库 - Knowledge Extractor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💡 知识库</h1>
+            <p><a href="index.html">← 返回首页</a></p>
+        </header>
+
+        <div class="section">
+            <h2>知识库管理</h2>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                <input type="text" id="searchInput" placeholder="搜索知识点..." 
+                       style="flex: 1; min-width: 200px; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
+                <button onclick="searchKnowledge()" class="btn">搜索</button>
+                <button onclick="loadKnowledge()" class="btn btn-secondary">重置</button>
+                <div style="flex: 1; min-width: 200px;">
+                    <select id="exportFormat" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
+                        <option value="">选择导出格式</option>
+                        <option value="markdown">导出为 Markdown</option>
+                        <option value="json">导出为 JSON</option>
+                        <option value="csv">导出为 CSV</option>
+                        <option value="html">导出为 HTML</option>
+                    </select>
+                </div>
+                <button onclick="exportKnowledge()" class="btn">导出</button>
+            </div>
+
+            <div id="message" class="message"></div>
+
+            <div id="knowledgeList" style="margin-top: 20px;">
+                <p style="color: #999;">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let currentKnowledge = [];
+
+        // 加载知识点
+        async function loadKnowledge() {
+            try {
+                const response = await fetch(`${API_BASE}/knowledge-points`);
+                const data = await response.json();
+
+                if (data.success) {
+                    currentKnowledge = data.data;
+                    displayKnowledge(currentKnowledge);
+                }
+            } catch (error) {
+                console.error('Error loading knowledge:', error);
+            }
+        }
+
+        // 搜索知识点
+        async function searchKnowledge() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                loadKnowledge();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/knowledge-points/search/${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayKnowledge(data.data);
+                }
+            } catch (error) {
+                console.error('Error searching knowledge:', error);
+            }
+        }
+
+        // 显示知识点
+        function displayKnowledge(knowledge) {
+            const knowledgeList = document.getElementById('knowledgeList');
+
+            if (!knowledge || knowledge.length === 0) {
+                knowledgeList.innerHTML = '<p style="color: #999;">没有找到知识点</p>';
+                return;
+            }
+
+            knowledgeList.innerHTML = '';
+
+            for (const point of knowledge) {
+                const statusColor = {
+                    'draft': '#ff9800',
+                    'reviewed': '#4caf50',
+                    'published': '#2196f3'
+                }[point.status] || '#999';
+
+                const sourcesHTML = point.sources && point.sources.length > 0 ?
+                    `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+                        <strong>来源：</strong>
+                        ${point.sources.map(s => 
+                            s.url ? `<a href="${s.url}" target="_blank" style="color: #667eea; text-decoration: none;">${s.title}</a>` 
+                                  : s.title
+                        ).join(', ')}
+                    </div>` : '';
+
+                const tagsHTML = point.tags && point.tags.length > 0 ?
+                    `<div style="margin-top: 10px;">
+                        ${point.tags.map(tag => 
+                            `<span style="display: inline-block; background: #e0e0e0; padding: 4px 8px; margin: 2px; border-radius: 4px; font-size: 0.9em;">${tag}</span>`
+                        ).join('')}
+                    </div>` : '';
+
+                const methodsHTML = point.methods && point.methods.length > 0 ?
+                    `<div style="margin-top: 10px;">
+                        <strong>解决方法：</strong>
+                        <ol style="margin: 5px 0 0 20px;">
+                            ${point.methods.map(method => `<li>${method}</li>`).join('')}
+                        </ol>
+                    </div>` : '';
+
+                const pointHTML = `
+                    <div style="padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <h3 style="margin: 0 0 10px 0; color: #333;">${point.problem}</h3>
+                                <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                                    状态：<span style="color: ${statusColor}; font-weight: bold;">${point.status}</span>
+                                </p>
+                                <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                                    创建时间：${new Date(point.createdAt).toLocaleString()}
+                                </p>
+                                ${methodsHTML}
+                                ${tagsHTML}
+                                ${sourcesHTML}
+                            </div>
+                            <div style="margin-left: 10px;">
+                                <button onclick="editKnowledge('${point.id}')" class="btn" style="padding: 8px 16px; font-size: 0.9em; display: block; margin-bottom: 5px;">
+                                    编辑
+                                </button>
+                                <button onclick="deleteKnowledge('${point.id}')" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.9em;">
+                                    删除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                knowledgeList.innerHTML += pointHTML;
+            }
+        }
+
+        // 编辑知识点
+        function editKnowledge(id) {
+            alert('编辑功能将在下一版本实现');
+        }
+
+        // 删除知识点
+        async function deleteKnowledge(id) {
+            if (!confirm('确定要删除这个知识点吗？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/knowledge-points/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    const messageDiv = document.getElementById('message');
+                    messageDiv.className = 'message success';
+                    messageDiv.textContent = '✓ 知识点已删除';
+                    loadKnowledge();
+                }
+            } catch (error) {
+                alert('删除失败：' + error.message);
+            }
+        }
+
+        // 导出知识点
+        async function exportKnowledge() {
+            const format = document.getElementById('exportFormat').value;
+            if (!format) {
+                alert('请选择导出格式');
+                return;
+            }
+
+            try {
+                window.location.href = `${API_BASE}/knowledge-points/export/${format}`;
+            } catch (error) {
+                alert('导出失败：' + error.message);
+            }
+        }
+
+        // 页面加载时获取知识点
+        loadKnowledge();
+        // 每30秒刷新一次
+        setInterval(loadKnowledge, 30000);
+
+        // 搜索框回车事件
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchKnowledge();
+            }
+        });
+    </script>
+</body>
+</html>

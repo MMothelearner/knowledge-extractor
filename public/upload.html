@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上传文档 - Knowledge Extractor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📤 上传文档</h1>
+            <p><a href="index.html">← 返回首页</a></p>
+        </header>
+
+        <div class="section">
+            <h2>上传文档</h2>
+            <div id="message" class="message"></div>
+
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label for="title">文档标题</label>
+                    <input type="text" id="title" name="title" placeholder="输入文档标题" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">文档描述</label>
+                    <textarea id="description" name="description" placeholder="输入文档描述（可选）"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="file">选择文件</label>
+                    <input type="file" id="file" name="file" 
+                           accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif" required>
+                    <small>支持格式：PDF、Word、TXT、图片（PNG、JPG、GIF）</small>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="btn">上传文档</button>
+                    <a href="index.html" class="btn btn-secondary">取消</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>最近上传的文档</h2>
+            <div id="documentsList" style="margin-top: 20px;">
+                <p style="color: #999;">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        // 处理表单提交
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData();
+            formData.append('file', document.getElementById('file').files[0]);
+            formData.append('title', document.getElementById('title').value);
+            formData.append('description', document.getElementById('description').value);
+
+            try {
+                const response = await fetch(`${API_BASE}/documents/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                const messageDiv = document.getElementById('message');
+
+                if (data.success) {
+                    messageDiv.className = 'message success';
+                    messageDiv.textContent = '✓ 文档上传成功，正在处理...';
+                    document.getElementById('uploadForm').reset();
+                    setTimeout(() => loadDocuments(), 1000);
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = '✗ 上传失败：' + data.error;
+                }
+            } catch (error) {
+                const messageDiv = document.getElementById('message');
+                messageDiv.className = 'message error';
+                messageDiv.textContent = '✗ 错误：' + error.message;
+            }
+        });
+
+        // 加载文档列表
+        async function loadDocuments() {
+            try {
+                const response = await fetch(`${API_BASE}/documents`);
+                const data = await response.json();
+
+                if (data.success && data.data.length > 0) {
+                    const documentsList = document.getElementById('documentsList');
+                    documentsList.innerHTML = '';
+
+                    // 按创建时间倒序排列
+                    const sorted = data.data.sort((a, b) => 
+                        new Date(b.createdAt) - new Date(a.createdAt)
+                    );
+
+                    for (const doc of sorted.slice(0, 10)) {
+                        const statusColor = {
+                            'processing': '#ff9800',
+                            'completed': '#4caf50',
+                            'failed': '#f44336'
+                        }[doc.status] || '#999';
+
+                        const knowledgeInfo = doc.extractedKnowledge ? 
+                            `<p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                                提取：${doc.extractedKnowledge.total || 0} 个 | 
+                                新增：${doc.extractedKnowledge.new || 0} 个 | 
+                                相同：${doc.extractedKnowledge.identical || 0} 个
+                            </p>` : '';
+
+                        const docHTML = `
+                            <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px;">
+                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                    <div>
+                                        <h3 style="margin: 0 0 5px 0; color: #333;">${doc.title}</h3>
+                                        <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                                            ${doc.fileName} (${(doc.fileSize / 1024).toFixed(2)} KB)
+                                        </p>
+                                        <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                                            上传时间：${new Date(doc.createdAt).toLocaleString()}
+                                        </p>
+                                        <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                                            状态：<span style="color: ${statusColor}; font-weight: bold;">${doc.status}</span>
+                                        </p>
+                                        ${knowledgeInfo}
+                                    </div>
+                                    <button onclick="deleteDocument('${doc.id}')" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.9em;">
+                                        删除
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        documentsList.innerHTML += docHTML;
+                    }
+                } else {
+                    document.getElementById('documentsList').innerHTML = 
+                        '<p style="color: #999;">还没有上传任何文档</p>';
+                }
+            } catch (error) {
+                console.error('Error loading documents:', error);
+            }
+        }
+
+        // 删除文档
+        async function deleteDocument(id) {
+            if (!confirm('确定要删除这个文档吗？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/documents/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    loadDocuments();
+                }
+            } catch (error) {
+                alert('删除失败：' + error.message);
+            }
+        }
+
+        // 页面加载时获取文档列表
+        loadDocuments();
+        // 每10秒刷新一次
+        setInterval(loadDocuments, 10000);
+    </script>
+</body>
+</html>
