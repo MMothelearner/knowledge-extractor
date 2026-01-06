@@ -3,7 +3,7 @@
  * 默认使用DeepSeek API
  */
 
-const fetch = require('node-fetch');
+const axios = require('axios');
 
 class LLMAnalyzer {
   constructor() {
@@ -55,25 +55,18 @@ class LLMAnalyzer {
     }
 
     try {
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
+      const response = await axios.post(this.apiUrl, payload, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`
         },
-        body: JSON.stringify(payload)
+        timeout: 30000
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`LLM API Error: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      return data.choices[0].message.content;
+      return response.data.choices[0].message.content;
     } catch (error) {
-      console.error('LLM Invocation Error:', error);
-      throw error;
+      console.error('LLM Invocation Error:', error.message);
+      throw new Error(`LLM API Error: ${error.message}`);
     }
   }
 

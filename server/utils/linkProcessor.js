@@ -1,5 +1,4 @@
 const axios = require('axios');
-const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
 
@@ -18,11 +17,11 @@ class LinkProcessor {
 
       const contentType = response.headers['content-type'];
       
-      if (contentType.includes('text/html')) {
+      if (contentType && contentType.includes('text/html')) {
         return this.extractWebpageContent(response.data, url);
-      } else if (contentType.includes('application/pdf')) {
+      } else if (contentType && contentType.includes('application/pdf')) {
         return this.handlePDFLink(response.data);
-      } else if (contentType.includes('text/plain')) {
+      } else if (contentType && contentType.includes('text/plain')) {
         return {
           type: 'text',
           content: response.data,
@@ -31,7 +30,7 @@ class LinkProcessor {
       } else {
         return {
           type: 'unknown',
-          content: response.data,
+          content: response.data.substring(0, 1000),
           url: url
         };
       }
@@ -41,48 +40,44 @@ class LinkProcessor {
   }
 
   /**
-   * 提取网页内容
+   * 提取网页内容 - 使用正则表达式，不依赖cheerio
    */
   static extractWebpageContent(html, url) {
     try {
-      const $ = cheerio.load(html);
-
       // 移除脚本和样式
-      $('script').remove();
-      $('style').remove();
+      let cleanHtml = html.replace(/<script[^>]*>.*?<\/script>/gis, '');
+      cleanHtml = cleanHtml.replace(/<style[^>]*>.*?<\/style>/gis, '');
 
       // 提取标题
-      const title = $('title').text() || $('h1').first().text();
+      const titleMatch = cleanHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const h1Match = cleanHtml.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+      const title = titleMatch ? titleMatch[1] : (h1Match ? h1Match[1] : 'Untitled');
 
-      // 提取主要内容
+      // 提取元描述
+      const descMatch = cleanHtml.match(/<meta\s+name=['"]description['"][^>]*content=['"]([^'"]*)['"]/i);
+      const description = descMatch ? descMatch[1] : '';
+
+      // 提取主要文本内容
       let content = '';
-      
-      // 优先提取 article 或 main 标签
-      const mainContent = $('article').length > 0 ? $('article') : 
-                         $('main').length > 0 ? $('main') : 
-                         $('body');
-
-      mainContent.find('p, h1, h2, h3, h4, h5, h6, li').each((i, elem) => {
-        const text = $(elem).text().trim();
+      const paragraphs = cleanHtml.match(/<(p|h[1-6]|li)[^>]*>([^<]+)<\/\1>/gi) || [];
+      paragraphs.forEach(p => {
+        const text = p.replace(/<[^>]+>/g, '').trim();
         if (text) {
           content += text + '\n';
         }
       });
 
-      // 提取元描述
-      const description = $('meta[name="description"]').attr('content') || '';
-
       // 检测是否为视频页面
       const isVideo = html.includes('youtube') || 
                      html.includes('vimeo') || 
                      html.includes('video') ||
-                     $('video').length > 0;
+                     html.includes('<video');
 
       return {
         type: isVideo ? 'video' : 'webpage',
         title: title,
         description: description,
-        content: content.trim(),
+        content: content.trim() || '无法提取内容',
         url: url
       };
     } catch (error) {
