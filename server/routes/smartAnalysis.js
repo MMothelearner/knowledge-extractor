@@ -6,9 +6,10 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const SmartDocumentProcessor = require('../utils/smartDocumentProcessor');
-
+const AdvancedLinkProcessor = require('../utils/advancedLinkProcessor');
 const router = express.Router();
 const processor = new SmartDocumentProcessor();
+const advancedLinkProcessor = new AdvancedLinkProcessor();
 
 // 配置文件上传
 const storage = multer.diskStorage({
@@ -109,7 +110,22 @@ router.post('/link', async (req, res) => {
 
     console.log(`开始处理链接: ${url}`);
 
-    const result = await processor.processLink(url);
+    // 使用改进的爬虫系统
+    const linkContent = await AdvancedLinkProcessor.fetchLinkContent(url);
+    console.log(`链接内容提取成功，内容长度: ${linkContent.content.length}`);
+
+    // 进行LLM分析
+    const analysis = await processor.llmAnalyzer.analyzeContent(linkContent.content, linkContent.type);
+
+    const result = {
+      url: url,
+      title: linkContent.title,
+      description: linkContent.description,
+      contentType: linkContent.type,
+      source: linkContent.source,
+      analysis: analysis,
+      processedAt: new Date().toISOString()
+    };
 
     res.json({
       success: true,
