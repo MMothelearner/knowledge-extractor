@@ -2,12 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { initDatabase } = require('./utils/initDatabase');
 
 // 导入路由
 const knowledgePointsRoutes = require('./routes/knowledgePoints');
 const documentsRoutes = require('./routes/documents');
 const linksRoutes = require('./routes/links');
 const smartAnalysisRoutes = require('./routes/smartAnalysis');
+const knowledgeEntriesRoutes = require('./routes/knowledgeEntries');
+const categoriesRoutes = require('./routes/categories');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,6 +39,8 @@ app.use('/api/knowledge-points', knowledgePointsRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/links', linksRoutes);
 app.use('/api/smart-analysis', smartAnalysisRoutes);
+app.use('/api/knowledge-entries', knowledgeEntriesRoutes);
+app.use('/api/categories', categoriesRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {
@@ -183,9 +188,24 @@ app.use((err, req, res, next) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
-  const actualPort = process.env.PORT || PORT;
-  console.log(`Knowledge Extractor is running on http://localhost:${actualPort}`);
-  console.log(`API documentation: http://localhost:${actualPort}/api/health`);
-  console.log(`Web interface: http://localhost:${actualPort}/`);
-});
+async function startServer() {
+  try {
+    // 初始化数据库
+    const dbInitialized = await initDatabase();
+    if (!dbInitialized) {
+      console.warn('警告: 数据库初始化失败，但服务器继续运行（使用文件存储）');
+    }
+
+    app.listen(PORT, () => {
+      const actualPort = process.env.PORT || PORT;
+      console.log(`Knowledge Extractor is running on http://localhost:${actualPort}`);
+      console.log(`API documentation: http://localhost:${actualPort}/api/health`);
+      console.log(`Web interface: http://localhost:${actualPort}/`);
+    });
+  } catch (error) {
+    console.error('启动服务器失败:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
