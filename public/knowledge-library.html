@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的知识库 - Knowledge Extractor</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .library-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .library-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .library-header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+
+        .library-header a {
+            background: white;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        .library-header a:hover {
+            opacity: 0.9;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+        }
+
+        .search-box button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        .search-box button:hover {
+            opacity: 0.9;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .filter-group label {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+
+        .sort-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .sort-controls label {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .sort-controls select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+
+        .entries-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .entry-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #667eea;
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+
+        .entry-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .entry-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+            flex: 1;
+        }
+
+        .entry-type {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            font-size: 0.85em;
+            color: #666;
+            margin-left: 10px;
+        }
+
+        .entry-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .entry-date {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .entry-source {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .entry-summary {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 12px;
+            max-height: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .entry-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #e8f0ff;
+            color: #667eea;
+            border-radius: 16px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .entry-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        .action-btn.view {
+            background: #667eea;
+            color: white;
+        }
+
+        .action-btn.edit {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .action-btn.delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .action-btn.export {
+            background: #28a745;
+            color: white;
+        }
+
+        .action-btn:hover {
+            opacity: 0.9;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #666;
+        }
+
+        .empty-state p {
+            margin-bottom: 20px;
+        }
+
+        .empty-state a {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: opacity 0.3s;
+        }
+
+        .empty-state a:hover {
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .detail-section {
+            margin-bottom: 25px;
+        }
+
+        .detail-section h3 {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+        }
+
+        .detail-section p, .detail-section pre {
+            color: #555;
+            line-height: 1.6;
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .detail-section pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            overflow-x: auto;
+        }
+
+        .detail-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 30px;
+            align-items: center;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .pagination button:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .pagination button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 768px) {
+            .library-header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .controls {
+                grid-template-columns: 1fr;
+            }
+
+            .entry-actions {
+                flex-wrap: wrap;
+            }
+
+            .action-btn {
+                flex: 1;
+                min-width: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="library-container">
+        <div class="library-header">
+            <div>
+                <h1>📚 我的知识库</h1>
+            </div>
+            <a href="index.html">← 返回首页</a>
+        </div>
+
+        <!-- 搜索和筛选控件 -->
+        <div class="controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="搜索标题、内容、标签...">
+                <button onclick="performSearch()">搜索</button>
+            </div>
+
+            <div class="filters">
+                <div class="filter-group">
+                    <label for="typeFilter">类型:</label>
+                    <select id="typeFilter" onchange="applyFilters()">
+                        <option value="">全部</option>
+                        <option value="link">链接</option>
+                        <option value="document">文档</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="categoryFilter">分类:</label>
+                    <select id="categoryFilter" onchange="applyFilters()">
+                        <option value="">全部</option>
+                        <option value="1">语法</option>
+                        <option value="2">词汇</option>
+                        <option value="3">听力</option>
+                        <option value="4">阅读</option>
+                        <option value="5">写作</option>
+                        <option value="6">口语</option>
+                        <option value="7">教学方法</option>
+                        <option value="8">教材介绍</option>
+                        <option value="9">教材用法</option>
+                        <option value="10">教材适合人群</option>
+                        <option value="11">考试准备</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sort-controls">
+                <label for="sortBy">排序:</label>
+                <select id="sortBy" onchange="applySorting()">
+                    <option value="title">标题 A-Z</option>
+                    <option value="date-desc">最新优先</option>
+                    <option value="date-asc">最旧优先</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 条目列表 -->
+        <div class="entries-list" id="entriesList">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>加载中...</p>
+            </div>
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- 详情模态框 -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeDetailModal()">&times;</span>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let allEntries = [];
+        let filteredEntries = [];
+        let currentPage = 1;
+        const itemsPerPage = 10;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadEntries();
+        });
+
+        // 加载所有条目
+        async function loadEntries() {
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge-entries`);
+                const data = await response.json();
+                allEntries = data.entries || [];
+                filteredEntries = [...allEntries];
+                renderEntries();
+            } catch (error) {
+                console.error('加载条目失败:', error);
+                showEmptyState('加载失败', '无法连接到服务器，请稍后重试');
+            }
+        }
+
+        // 执行搜索
+        function performSearch() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            filteredEntries = allEntries.filter(entry => {
+                return entry.title.toLowerCase().includes(searchTerm) ||
+                       entry.summary.toLowerCase().includes(searchTerm) ||
+                       (entry.userNotes && entry.userNotes.toLowerCase().includes(searchTerm));
+            });
+            currentPage = 1;
+            renderEntries();
+        }
+
+        // 应用筛选
+        function applyFilters() {
+            const typeFilter = document.getElementById('typeFilter').value;
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+            filteredEntries = allEntries.filter(entry => {
+                const matchType = !typeFilter || entry.sourceType === typeFilter;
+                const matchCategory = !categoryFilter || (entry.categoryIds && entry.categoryIds.includes(parseInt(categoryFilter)));
+                const matchSearch = !searchTerm || 
+                    entry.title.toLowerCase().includes(searchTerm) ||
+                    entry.summary.toLowerCase().includes(searchTerm);
+                
+                return matchType && matchCategory && matchSearch;
+            });
+            currentPage = 1;
+            renderEntries();
+        }
+
+        // 应用排序
+        function applySorting() {
+            const sortBy = document.getElementById('sortBy').value;
+            
+            if (sortBy === 'title') {
+                filteredEntries.sort((a, b) => a.title.localeCompare(b.title));
+            } else if (sortBy === 'date-desc') {
+                filteredEntries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            } else if (sortBy === 'date-asc') {
+                filteredEntries.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            }
+            
+            currentPage = 1;
+            renderEntries();
+        }
+
+        // 渲染条目列表
+        function renderEntries() {
+            const entriesList = document.getElementById('entriesList');
+            
+            if (filteredEntries.length === 0) {
+                showEmptyState('暂无条目', '开始处理链接或上传文档来创建知识库条目');
+                return;
+            }
+
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const pageEntries = filteredEntries.slice(start, end);
+
+            entriesList.innerHTML = pageEntries.map(entry => `
+                <div class="entry-card">
+                    <div class="entry-header">
+                        <h3 class="entry-title">${escapeHtml(entry.title)}</h3>
+                        <span class="entry-type">${entry.sourceType === 'link' ? '🔗 链接' : '📄 文档'}</span>
+                    </div>
+                    <div class="entry-meta">
+                        <div class="entry-date">📅 ${new Date(entry.createdAt).toLocaleDateString('zh-CN')}</div>
+                        <div class="entry-source" title="${escapeHtml(entry.source)}">🔗 ${escapeHtml(entry.source.substring(0, 50))}</div>
+                    </div>
+                    <div class="entry-summary">${escapeHtml(entry.summary)}</div>
+                    <div class="entry-tags">
+                        ${(entry.categoryIds || []).map(catId => {
+                            const categories = {
+                                1: '语法', 2: '词汇', 3: '听力', 4: '阅读', 5: '写作',
+                                6: '口语', 7: '教学方法', 8: '教材介绍', 9: '教材用法',
+                                10: '教材适合人群', 11: '考试准备'
+                            };
+                            return `<span class="tag">${categories[catId] || '未分类'}</span>`;
+                        }).join('')}
+                    </div>
+                    <div class="entry-actions">
+                        <button class="action-btn view" onclick="viewDetail(${entry.id})">查看详情</button>
+                        <button class="action-btn edit" onclick="editEntry(${entry.id})">编辑</button>
+                        <button class="action-btn export" onclick="exportEntry(${entry.id})">导出</button>
+                        <button class="action-btn delete" onclick="deleteEntry(${entry.id})">删除</button>
+                    </div>
+                </div>
+            `).join('');
+
+            renderPagination();
+        }
+
+        // 渲染分页
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
+            const pagination = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = '<button onclick="previousPage()" ' + (currentPage === 1 ? 'disabled' : '') + '>← 上一页</button>';
+            
+            for (let i = 1; i <= totalPages; i++) {
+                html += `<button onclick="goToPage(${i})" class="${i === currentPage ? 'active' : ''}">${i}</button>`;
+            }
+            
+            html += '<button onclick="nextPage()" ' + (currentPage === totalPages ? 'disabled' : '') + '>下一页 →</button>';
+            
+            pagination.innerHTML = html;
+        }
+
+        // 分页函数
+        function previousPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderEntries();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderEntries();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            renderEntries();
+            window.scrollTo(0, 0);
+        }
+
+        // 查看详情
+        function viewDetail(entryId) {
+            const entry = allEntries.find(e => e.id === entryId);
+            if (!entry) return;
+
+            const modal = document.getElementById('detailModal');
+            const content = document.getElementById('detailContent');
+
+            content.innerHTML = `
+                <h2>${escapeHtml(entry.title)}</h2>
+                
+                <div class="detail-section">
+                    <h3>基本信息</h3>
+                    <p><strong>来源:</strong> ${escapeHtml(entry.source)}</p>
+                    <p><strong>类型:</strong> ${entry.sourceType === 'link' ? '链接' : '文档'}</p>
+                    <p><strong>创建时间:</strong> ${new Date(entry.createdAt).toLocaleString('zh-CN')}</p>
+                </div>
+
+                <div class="detail-section">
+                    <h3>摘要</h3>
+                    <p>${escapeHtml(entry.summary)}</p>
+                </div>
+
+                <div class="detail-section">
+                    <h3>完整内容</h3>
+                    <pre>${escapeHtml(entry.content)}</pre>
+                </div>
+
+                ${entry.llmAnalysis ? `
+                    <div class="detail-section">
+                        <h3>LLM分析结果</h3>
+                        <pre>${escapeHtml(JSON.stringify(entry.llmAnalysis, null, 2))}</pre>
+                    </div>
+                ` : ''}
+
+                ${entry.userNotes ? `
+                    <div class="detail-section">
+                        <h3>用户笔记</h3>
+                        <p>${escapeHtml(entry.userNotes)}</p>
+                    </div>
+                ` : ''}
+
+                <div class="detail-section">
+                    <h3>分类标签</h3>
+                    <div class="detail-tags">
+                        ${(entry.categoryIds || []).map(catId => {
+                            const categories = {
+                                1: '语法', 2: '词汇', 3: '听力', 4: '阅读', 5: '写作',
+                                6: '口语', 7: '教学方法', 8: '教材介绍', 9: '教材用法',
+                                10: '教材适合人群', 11: '考试准备'
+                            };
+                            return `<span class="tag">${categories[catId] || '未分类'}</span>`;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+
+            modal.style.display = 'block';
+        }
+
+        // 关闭详情模态框
+        function closeDetailModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        // 编辑条目
+        function editEntry(entryId) {
+            alert('编辑功能即将推出');
+        }
+
+        // 删除条目
+        async function deleteEntry(entryId) {
+            if (!confirm('确定要删除这个条目吗？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge-entries/${entryId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert('删除成功');
+                    loadEntries();
+                } else {
+                    alert('删除失败');
+                }
+            } catch (error) {
+                console.error('删除失败:', error);
+                alert('删除失败');
+            }
+        }
+
+        // 导出条目
+        async function exportEntry(entryId) {
+            const entry = allEntries.find(e => e.id === entryId);
+            if (!entry) return;
+
+            const content = `
+标题: ${entry.title}
+来源: ${entry.source}
+类型: ${entry.sourceType === 'link' ? '链接' : '文档'}
+创建时间: ${new Date(entry.createdAt).toLocaleString('zh-CN')}
+
+摘要:
+${entry.summary}
+
+完整内容:
+${entry.content}
+
+${entry.userNotes ? `用户笔记:\n${entry.userNotes}\n` : ''}
+
+${entry.llmAnalysis ? `LLM分析结果:\n${JSON.stringify(entry.llmAnalysis, null, 2)}\n` : ''}
+            `;
+
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `${entry.title}.txt`;
+            link.click();
+        }
+
+        // 显示空状态
+        function showEmptyState(title, message) {
+            const entriesList = document.getElementById('entriesList');
+            entriesList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <h3>${title}</h3>
+                    <p>${message}</p>
+                    <a href="index.html">开始创建条目</a>
+                </div>
+            `;
+            document.getElementById('pagination').innerHTML = '';
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+</html>

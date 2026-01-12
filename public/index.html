@@ -40,6 +40,29 @@
             opacity: 0.9;
         }
 
+        .header-nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .header-nav a {
+            display: inline-block;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.3s;
+            font-weight: 500;
+        }
+
+        .header-nav a:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         .main-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -264,6 +287,10 @@
         <header>
             <h1>🧠 Knowledge Extractor</h1>
             <p>智能知识提炼和组织系统</p>
+            <div class="header-nav">
+                <a href="index.html">首页</a>
+                <a href="knowledge-library.html">📚 我的知识库</a>
+            </div>
         </header>
 
         <div class="main-grid">
