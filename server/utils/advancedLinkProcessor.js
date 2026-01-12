@@ -1,12 +1,100 @@
 /**
- * 高级链接处理器 - 支持JavaScript渲染和多平台
- * 使用Puppeteer处理动态网站
+ * 高级链接处理器 - 支持多平台
+ * 不使用cheerio，避免undici依赖问题
  */
 
 const axios = require('axios');
-const cheerio = require('cheerio');
 
 class AdvancedLinkProcessor {
+  /**
+   * 从HTML中提取meta标签内容
+   */
+  static extractMetaContent(html, property, fallbackName = null) {
+    try {
+      // 尝试提取property属性
+      let match = html.match(new RegExp(`<meta\\s+property=["']${property}["']\\s+content=["']([^"']*?)["']`, 'i'));
+      if (match && match[1]) return match[1];
+
+      // 尝试提取name属性
+      if (fallbackName) {
+        match = html.match(new RegExp(`<meta\\s+name=["']${fallbackName}["']\\s+content=["']([^"']*?)["']`, 'i'));
+        if (match && match[1]) return match[1];
+      }
+
+      return '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /**
+   * 从HTML中提取title
+   */
+  static extractTitle(html) {
+    try {
+      const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      return match ? match[1].trim() : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /**
+   * 从HTML中提取JSON-LD数据
+   */
+  static extractJsonLd(html) {
+    try {
+      const matches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([^<]+)<\/script>/gi);
+      if (!matches) return '';
+
+      let content = '';
+      for (const match of matches) {
+        try {
+          const jsonStr = match.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '');
+          const json = JSON.parse(jsonStr);
+          if (json.description) content += json.description + '\n';
+          if (json.text) content += json.text + '\n';
+        } catch (e) {
+          // 忽略JSON解析错误
+        }
+      }
+      return content.trim();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /**
+   * 从HTML中提取纯文本内容
+   */
+  static extractPlainText(html) {
+    try {
+      // 移除script和style标签
+      let text = html.replace(/<script[^>]*>.*?<\/script>/gi, '');
+      text = text.replace(/<style[^>]*>.*?<\/style>/gi, '');
+      
+      // 移除HTML标签
+      text = text.replace(/<[^>]+>/g, '');
+      
+      // 解码HTML实体
+      text = text
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&');
+      
+      // 清理空白
+      const lines = text.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 10);
+      
+      return lines.slice(0, 10).join('\n');
+    } catch (e) {
+      return '';
+    }
+  }
+
   /**
    * 获取链接内容 - 支持多平台
    */
@@ -79,12 +167,9 @@ class AdvancedLinkProcessor {
    */
   static async handleDouyin(url) {
     try {
-      // 抖音链接需要特殊处理
-      // 尝试从URL中提取视频ID
       const videoIdMatch = url.match(/video\/(\d+)/);
       const videoId = videoIdMatch ? videoIdMatch[1] : '';
 
-      // 使用User-Agent伪装
       const response = await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1',
@@ -97,55 +182,23 @@ class AdvancedLinkProcessor {
       });
 
       const html = response.data;
-      const $ = cheerio.load(html);
 
-      // 提取标题
-      let title = $('meta[property="og:title"]').attr('content') || 
-                  $('meta[name="title"]').attr('content') || 
-                  $('title').text() || 
-                  '抖音视频';
+      const title = this.extractMetaContent(html, 'og:title') || 
+                    this.extractTitle(html) || 
+                    '抖音视频';
 
-      // 提取描述
-      let description = $('meta[property="og:description"]').attr('content') || 
-                        $('meta[name="description"]').attr('content') || 
-                        '';
+      const description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
-      // 提取视频内容（通常在JSON-LD中）
-      let content = '';
-      
-      // 尝试从多个位置提取内容
-      const scripts = $('script[type="application/ld+json"]');
-      scripts.each((i, elem) => {
-        try {
-          const json = JSON.parse($(elem).html());
-          if (json.description) {
-            content += json.description + '\n';
-          }
-          if (json.text) {
-            content += json.text + '\n';
-          }
-        } catch (e) {
-          // JSON解析失败，继续
-        }
-      });
+      const jsonLdContent = this.extractJsonLd(html);
+      const plainText = this.extractPlainText(html);
 
-      // 如果还没有内容，尝试从其他地方提取
-      if (!content.trim()) {
-        // 提取页面中的文本内容
-        const textContent = $('body').text();
-        // 清理和提取有意义的内容
-        content = textContent
-          .split('\n')
-          .filter(line => line.trim().length > 10)
-          .slice(0, 5)
-          .join('\n');
-      }
+      const content = (description + '\n' + jsonLdContent + '\n' + plainText).trim();
 
       return {
         type: 'douyin_video',
         title: title.trim(),
         description: description.trim(),
-        content: (description + '\n' + content).trim(),
+        content: content,
         url: url,
         videoId: videoId,
         source: 'douyin'
@@ -170,39 +223,21 @@ class AdvancedLinkProcessor {
       });
 
       const html = response.data;
-      const $ = cheerio.load(html);
 
-      // 提取标题
-      const title = $('meta[property="og:title"]').attr('content') || 
-                    $('title').text() || 
+      const title = this.extractMetaContent(html, 'og:title') || 
+                    this.extractTitle(html) || 
                     '小红书笔记';
 
-      // 提取描述
-      const description = $('meta[property="og:description"]').attr('content') || 
-                          $('meta[name="description"]').attr('content') || 
-                          '';
+      const description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
-      // 提取内容
-      let content = description;
-      
-      // 尝试从JSON-LD提取
-      const scripts = $('script[type="application/ld+json"]');
-      scripts.each((i, elem) => {
-        try {
-          const json = JSON.parse($(elem).html());
-          if (json.description) {
-            content += '\n' + json.description;
-          }
-        } catch (e) {
-          // 忽略JSON解析错误
-        }
-      });
+      const jsonLdContent = this.extractJsonLd(html);
+      const content = (description + '\n' + jsonLdContent).trim();
 
       return {
         type: 'xiaohongshu_post',
         title: title.trim(),
         description: description.trim(),
-        content: content.trim(),
+        content: content,
         url: url,
         source: 'xiaohongshu'
       };
@@ -224,16 +259,12 @@ class AdvancedLinkProcessor {
       });
 
       const html = response.data;
-      const $ = cheerio.load(html);
 
-      const title = $('meta[property="og:title"]').attr('content') || 
-                    $('meta[name="title"]').attr('content') || 
-                    $('title').text() || 
+      const title = this.extractMetaContent(html, 'og:title') || 
+                    this.extractTitle(html) || 
                     'YouTube Video';
 
-      const description = $('meta[property="og:description"]').attr('content') || 
-                          $('meta[name="description"]').attr('content') || 
-                          '';
+      const description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
       const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
       const videoId = videoIdMatch ? videoIdMatch[1] : '';
@@ -259,31 +290,26 @@ class AdvancedLinkProcessor {
     try {
       const response = await axios.get(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X)',
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9'
         },
         timeout: 15000
       });
 
       const html = response.data;
-      const $ = cheerio.load(html);
 
-      const title = $('title').text() || '微博';
-      const description = $('meta[name="description"]').attr('content') || '';
+      const title = this.extractMetaContent(html, 'og:title') || 
+                    this.extractTitle(html) || 
+                    '微博';
 
-      // 提取微博正文
-      let content = description;
-      $('div[class*="text"]').each((i, elem) => {
-        const text = $(elem).text().trim();
-        if (text && text.length > 10) {
-          content += '\n' + text;
-        }
-      });
+      const description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
       return {
         type: 'weibo_post',
         title: title.trim(),
         description: description.trim(),
-        content: content.trim(),
+        content: description.trim(),
         url: url,
         source: 'weibo'
       };
@@ -299,22 +325,23 @@ class AdvancedLinkProcessor {
     try {
       const response = await axios.get(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9'
         },
         timeout: 15000
       });
 
       const html = response.data;
-      const $ = cheerio.load(html);
 
-      const title = $('meta[property="og:title"]').attr('content') || 
-                    $('meta[name="title"]').attr('content') || 
-                    $('title').text() || 
-                    'B站视频';
+      const title = this.extractMetaContent(html, 'og:title') || 
+                    this.extractTitle(html) || 
+                    'Bilibili视频';
 
-      const description = $('meta[property="og:description"]').attr('content') || 
-                          $('meta[name="description"]').attr('content') || 
-                          '';
+      const description = this.extractMetaContent(html, 'og:description', 'description') || '';
+
+      const videoIdMatch = url.match(/\/video\/(BV[a-zA-Z0-9]+)/);
+      const videoId = videoIdMatch ? videoIdMatch[1] : '';
 
       return {
         type: 'bilibili_video',
@@ -322,6 +349,7 @@ class AdvancedLinkProcessor {
         description: description.trim(),
         content: description.trim(),
         url: url,
+        videoId: videoId,
         source: 'bilibili'
       };
     } catch (error) {
@@ -330,69 +358,38 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 处理通用网页
+   * 处理通用链接
    */
   static async handleGeneric(url) {
     try {
       const response = await axios.get(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          'Referer': 'https://www.google.com/'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         },
-        timeout: 15000,
-        maxRedirects: 5
+        timeout: 15000
       });
 
       const html = response.data;
-      const $ = cheerio.load(html);
 
-      // 提取标题
-      const title = $('meta[property="og:title"]').attr('content') || 
-                    $('meta[name="title"]').attr('content') || 
-                    $('h1').first().text() || 
-                    $('title').text() || 
-                    new URL(url).hostname;
+      const title = this.extractMetaContent(html, 'og:title') || 
+                    this.extractTitle(html) || 
+                    'Web Page';
 
-      // 提取描述
-      const description = $('meta[property="og:description"]').attr('content') || 
-                          $('meta[name="description"]').attr('content') || 
-                          '';
+      const description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
-      // 提取主要内容
-      let content = '';
-      
-      // 移除脚本和样式
-      $('script, style').remove();
-      
-      // 提取段落
-      $('p, article, main, [role="main"]').each((i, elem) => {
-        const text = $(elem).text().trim();
-        if (text && text.length > 20) {
-          content += text + '\n\n';
-        }
-      });
-
-      // 如果没有提取到足够的内容，尝试提取所有文本
-      if (content.trim().length < 50) {
-        content = $('body').text()
-          .split('\n')
-          .filter(line => line.trim().length > 10)
-          .slice(0, 10)
-          .join('\n');
-      }
+      const plainText = this.extractPlainText(html);
+      const content = (description + '\n' + plainText).trim();
 
       return {
         type: 'webpage',
         title: title.trim(),
         description: description.trim(),
-        content: (description + '\n\n' + content).trim(),
+        content: content,
         url: url,
         source: 'generic'
       };
     } catch (error) {
-      throw new Error(`网页处理失败: ${error.message}`);
+      throw new Error(`网页链接处理失败: ${error.message}`);
     }
   }
 }
