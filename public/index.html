@@ -631,7 +631,7 @@
                 const response = await fetch('/api/categories');
                 const data = await response.json();
                 if (data.success) {
-                    allCategories = data.categories || [];
+                    allCategories = data.data || data.categories || [];
                     renderCategoryCheckboxes();
                 }
             } catch (error) {
