@@ -647,10 +647,12 @@
             allCategories.forEach(cat => {
                 const checkboxItem = document.createElement('div');
                 checkboxItem.className = 'checkbox-item';
+                // 显示中文分类名（description），而不是英文名（name）
+                const categoryLabel = cat.description || cat.name;
                 checkboxItem.innerHTML = `
                     <input type="checkbox" id="cat_${cat.id}" value="${cat.id}" 
                            ${suggestedCategoryIds.includes(cat.id) ? 'checked' : ''}>
-                    <label for="cat_${cat.id}">${cat.name}</label>
+                    <label for="cat_${cat.id}">${categoryLabel}</label>
                 `;
                 container.appendChild(checkboxItem);
             });
@@ -867,7 +869,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        title: currentAnalysisData.title || 'Untitled',
+                        title: currentAnalysisData.title || currentAnalysisData.problem || 'Untitled',
                         summary: currentAnalysisData.summary || '',
                         llmAnalysis: currentAnalysisData
                     })
@@ -898,7 +900,8 @@
                 if (category) {
                     const tag = document.createElement('div');
                     tag.className = 'category-tag selected';
-                    tag.textContent = category.name;
+                    // 显示中文分类名
+                    tag.textContent = category.description || category.name;
                     container.appendChild(tag);
                 }
             });
@@ -930,7 +933,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        title: currentAnalysisData.title || 'Untitled',
+                        title: currentAnalysisData.title || currentAnalysisData.problem || 'Untitled',
                         source: currentSource,
                         sourceType: currentSourceType,
                         summary: currentAnalysisData.summary || '',

@@ -75,7 +75,7 @@ class LLMAnalyzer {
    */
   async analyzeContent(content, contentType = 'text') {
     try {
-      // 第一步：识别问题和方法
+      // 第一步：识别问题、主题和方法
       const analysisPrompt = `你是一个专业的知识提炼专家。请分析以下${contentType}内容，并按照要求输出结构化的知识。
 
 内容：
@@ -83,7 +83,8 @@ ${content}
 
 请按照以下JSON格式输出，不要包含任何其他文字：
 {
-  "problem": "这个内容解决的核心问题是什么？（一句话，简洁准确）",
+  "problem": "这个内容解决的核心问题是什么？（一句话，简洁准确，不超过20字）",
+  "topic": "此内容所属的主题领域（如：英语语法、英语单词、英语听力、英语阅读、英语写作、英语口语等）",
   "methods": ["具体方法1", "具体方法2", "具体方法3"],
   "keywords": ["关键词1", "关键词2", "关键词3"],
   "summary": "内容总结（2-3句话，精炼准确）"
@@ -91,9 +92,10 @@ ${content}
 
 要求：
 1. problem字段必须简洁明确，不超过20个字
-2. methods数组中每个方法都要具体可操作，不要有废话
-3. keywords应该是最核心的3-5个关键词
-4. summary要精炼，不要冗长`;
+2. topic字段应该是明确的主题领域名称
+3. methods数组中每个方法都要具体可操作，不要有废话
+4. keywords应该是最核心的3-5个关键词
+5. summary要精炼，不要冗长`;
 
       const analysisResponse = await this.invokeLLM(
         [{ role: 'user', content: analysisPrompt }]
@@ -116,6 +118,10 @@ ${content}
       if (!analysis.problem || !analysis.methods || !analysis.keywords || !analysis.summary) {
         throw new Error('Invalid analysis response: missing required fields');
       }
+
+      // 生成友好的标题：[主题]：[问题]
+      const topic = analysis.topic || '英语学习';
+      const generatedTitle = `${topic}：${analysis.problem}`;
 
       // 第二步：生成思维导图
       const mindmapPrompt = `基于以下内容，生成一个Mermaid格式的思维导图：
@@ -148,7 +154,9 @@ ${analysis.keywords.map(k => `      ${k}`).join('\n')}`;
       }
 
       return {
+        title: generatedTitle,
         problem: analysis.problem,
+        topic: analysis.topic || '英语学习',
         methods: analysis.methods,
         keywords: analysis.keywords,
         summary: analysis.summary,
