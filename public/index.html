@@ -879,6 +879,7 @@
                 if (data.success) {
                     suggestedCategoryIds = data.suggestedCategories || [];
                     renderSuggestedCategories();
+                    loadCategories();  // 加载分类列表
                     renderCategoryCheckboxes();
                 }
             } catch (error) {
