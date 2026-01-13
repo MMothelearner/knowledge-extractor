@@ -46,7 +46,8 @@ class KnowledgeEntry {
     try {
       let query_text = `
         SELECT ke.*, 
-               array_agg(json_build_object('id', c.id, 'name', c.name)) as categories
+               COALESCE(array_agg(DISTINCT c.id) FILTER (WHERE c.id IS NOT NULL), ARRAY[]::int[]) as categoryIds,
+               array_agg(json_build_object('id', c.id, 'name', c.name)) FILTER (WHERE c.id IS NOT NULL) as categories
         FROM knowledge_entries ke
         LEFT JOIN entry_categories ec ON ke.id = ec.entry_id
         LEFT JOIN categories c ON ec.category_id = c.id
@@ -57,6 +58,7 @@ class KnowledgeEntry {
       if (filters.categoryIds && filters.categoryIds.length > 0) {
         query_text = `
           SELECT ke.*, 
+                 array_agg(DISTINCT c.id) as categoryIds,
                  array_agg(json_build_object('id', c.id, 'name', c.name)) as categories
           FROM knowledge_entries ke
           INNER JOIN entry_categories ec ON ke.id = ec.entry_id
