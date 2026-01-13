@@ -559,8 +559,8 @@
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
             filteredEntries = allEntries.filter(entry => {
-                const matchType = !typeFilter || entry.sourceType === typeFilter;
-                const matchCategory = !categoryFilter || (entry.categoryIds && entry.categoryIds.includes(parseInt(categoryFilter)));
+                const matchType = !typeFilter || entry.source_type === typeFilter;
+                const matchCategory = !categoryFilter || (entry.categoryids && entry.categoryids.includes(parseInt(categoryFilter)));
                 const matchSearch = !searchTerm || 
                     entry.title.toLowerCase().includes(searchTerm) ||
                     entry.summary.toLowerCase().includes(searchTerm);
