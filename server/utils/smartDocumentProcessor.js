@@ -92,11 +92,10 @@ class SmartDocumentProcessor {
       // 3. 返回结构化结果
       return {
         title: analysis.title,  // 使用LLM生成的标题
-        fileName: fileName,
-        contentLength: content.length,
+        url: url,
+        contentLength: linkContent.length,
         analysis: analysis,
         processedAt: new Date().toISOString()
-      };
       };
     } catch (error) {
       console.error('Link Processing Error:', error);
