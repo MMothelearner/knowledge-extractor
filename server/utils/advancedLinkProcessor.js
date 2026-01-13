@@ -126,8 +126,8 @@ class AdvancedLinkProcessor {
           result = await this.handleGeneric(url);
       }
 
-      // 验证内容
-      if (!result.content || result.content.trim().length < 20) {
+      // 验证内容 - 小红书笔记标题通常较短，使用较低的阈值
+      if (!result.content || result.content.trim().length < 10) {
         throw new Error(`无法提取有效内容。网站类型: ${siteType}，提取的内容长度: ${result.content?.length || 0}`);
       }
 
@@ -209,35 +209,98 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 处理小红书链接
+   * 处理小红书链接 - 改进版本
    */
   static async handleXiaohongshu(url) {
     try {
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9'
-        },
-        timeout: 15000
-      });
+      let html = '';
+      
+      // 尝试使用ScrapeOps代理
+      const apiKey = process.env.SCRAPEOPS_API_KEY;
+      if (apiKey) {
+        try {
+          console.log('使用ScrapeOps代理获取小红书内容...');
+          const proxyUrl = 'https://proxy.scrapeops.io/v1/';
+          const response = await axios.get(proxyUrl, {
+            params: {
+              api_key: apiKey,
+              url: url
+            },
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            timeout: 30000
+          });
+          html = response.data;
+        } catch (proxyError) {
+          console.warn('ScrapeOps代理失败，尝试直接访问:', proxyError.message);
+          const response = await axios.get(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'zh-CN,zh;q=0.9'
+            },
+            timeout: 15000
+          });
+          html = response.data;
+        }
+      } else {
+        const response = await axios.get(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9'
+          },
+          timeout: 15000
+        });
+        html = response.data;
+      }
 
-      const html = response.data;
+      // 提取标题
+      let title = this.extractMetaContent(html, 'og:title') || 
+                  this.extractTitle(html) || 
+                  '小红书笔记';
+      
+      // 清理标题
+      title = title.replace(/\s*-\s*小红书\s*$/, '').trim();
 
-      const title = this.extractMetaContent(html, 'og:title') || 
-                    this.extractTitle(html) || 
-                    '小红书笔记';
-
+      // 提取描述
       const description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
-      const jsonLdContent = this.extractJsonLd(html);
-      const content = (description + '\n' + jsonLdContent).trim();
+      // 提取内容 - 优先使用标题作为内容
+      let content = title.replace(/\s*-\s*小红书\s*$/, '').trim();
+      
+      // 如果标题太短或为空，尝试从其他地方提取
+      if (content.length < 10) {
+        // 方法一：从JavaScript数据中提取
+        const dataMatches = html.match(/"desc":"([^"]*)"|"content":"([^"]*)"/g);
+        if (dataMatches && dataMatches.length > 0) {
+          for (const match of dataMatches) {
+            const valueMatch = match.match(/"(?:desc|content)":"([^"]*)"/);  
+            if (valueMatch && valueMatch[1]) {
+              const text = valueMatch[1].trim();
+              if (text.length > 10 && !text.match(/^\d+$/) && !text.match(/javascript|function|小红书/i)) {
+                content = text;
+                break;
+              }
+            }
+          }
+        }
+        
+        // 方法二：从JSON-LD中提取
+        if (content.length < 20) {
+          const jsonLdContent = this.extractJsonLd(html);
+          if (jsonLdContent.length > 20) {
+            content = jsonLdContent;
+          }
+        }
+      }
 
       return {
         type: 'xiaohongshu_post',
-        title: title.trim(),
+        title: title,
         description: description.trim(),
-        content: content,
+        content: content.trim(),
         url: url,
         source: 'xiaohongshu'
       };
@@ -253,7 +316,8 @@ class AdvancedLinkProcessor {
     try {
       const response = await axios.get(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         },
         timeout: 15000
       });
@@ -262,18 +326,21 @@ class AdvancedLinkProcessor {
 
       const title = this.extractMetaContent(html, 'og:title') || 
                     this.extractTitle(html) || 
-                    'YouTube Video';
+                    'YouTube视频';
 
       const description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
       const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
       const videoId = videoIdMatch ? videoIdMatch[1] : '';
 
+      const jsonLdContent = this.extractJsonLd(html);
+      const content = (description + '\n' + jsonLdContent).trim();
+
       return {
         type: 'youtube_video',
         title: title.trim(),
         description: description.trim(),
-        content: description.trim(),
+        content: content,
         url: url,
         videoId: videoId,
         source: 'youtube'
@@ -299,17 +366,18 @@ class AdvancedLinkProcessor {
 
       const html = response.data;
 
-      const title = this.extractMetaContent(html, 'og:title') || 
-                    this.extractTitle(html) || 
-                    '微博';
-
+      const title = this.extractTitle(html) || '微博';
       const description = this.extractMetaContent(html, 'og:description', 'description') || '';
+      const jsonLdContent = this.extractJsonLd(html);
+      const plainText = this.extractPlainText(html);
+
+      const content = (description + '\n' + jsonLdContent + '\n' + plainText).trim();
 
       return {
         type: 'weibo_post',
         title: title.trim(),
         description: description.trim(),
-        content: description.trim(),
+        content: content,
         url: url,
         source: 'weibo'
       };
@@ -319,15 +387,14 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 处理B站链接
+   * 处理Bilibili链接
    */
   static async handleBilibili(url) {
     try {
       const response = await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9'
+          'Referer': 'https://www.bilibili.com/'
         },
         timeout: 15000
       });
@@ -340,25 +407,28 @@ class AdvancedLinkProcessor {
 
       const description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
-      const videoIdMatch = url.match(/\/video\/(BV[a-zA-Z0-9]+)/);
+      const videoIdMatch = url.match(/\/video\/(BV[^/?]+)/);
       const videoId = videoIdMatch ? videoIdMatch[1] : '';
+
+      const jsonLdContent = this.extractJsonLd(html);
+      const content = (description + '\n' + jsonLdContent).trim();
 
       return {
         type: 'bilibili_video',
         title: title.trim(),
         description: description.trim(),
-        content: description.trim(),
+        content: content,
         url: url,
         videoId: videoId,
         source: 'bilibili'
       };
     } catch (error) {
-      throw new Error(`B站链接处理失败: ${error.message}`);
+      throw new Error(`Bilibili链接处理失败: ${error.message}`);
     }
   }
 
   /**
-   * 处理通用链接
+   * 处理通用网页
    */
   static async handleGeneric(url) {
     try {
@@ -377,8 +447,10 @@ class AdvancedLinkProcessor {
 
       const description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
+      const jsonLdContent = this.extractJsonLd(html);
       const plainText = this.extractPlainText(html);
-      const content = (description + '\n' + plainText).trim();
+
+      const content = (description + '\n' + jsonLdContent + '\n' + plainText).trim();
 
       return {
         type: 'webpage',
@@ -386,7 +458,7 @@ class AdvancedLinkProcessor {
         description: description.trim(),
         content: content,
         url: url,
-        source: 'generic'
+        source: 'webpage'
       };
     } catch (error) {
       throw new Error(`网页链接处理失败: ${error.message}`);
