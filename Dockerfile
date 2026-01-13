@@ -1,4 +1,4 @@
-FROM node:18.20.8-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -8,11 +8,8 @@ RUN apk add --no-cache poppler-utils
 # 复制package文件
 COPY package*.json ./
 
-# 设置npm配置以加快安装速度
-RUN npm config set fetch-timeout 120000 && npm config set fetch-retry-mintimeout 20000 && npm config set fetch-retry-maxtimeout 120000
-
 # 安装依赖
-RUN npm install --production --no-optional --legacy-peer-deps
+RUN npm ci --production --no-optional
 
 # 复制应用代码
 COPY . .
