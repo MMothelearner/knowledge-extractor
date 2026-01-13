@@ -1,8 +1,12 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const LLMAnalyzer = require('./llmAnalyzer');
+
+// 使用stealth插件
+puppeteer.use(StealthPlugin());
 
 let browser = null;
 
@@ -12,7 +16,14 @@ async function getBrowser() {
     try {
       browser = await puppeteer.launch({
         headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--single-process'
+        ],
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH
       });
     } catch (error) {
       console.error('Failed to launch browser:', error);
