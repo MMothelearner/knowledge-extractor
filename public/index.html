@@ -879,8 +879,7 @@
                 if (data.success) {
                     suggestedCategoryIds = data.suggestedCategories || [];
                     renderSuggestedCategories();
-                    loadCategories();  // 加载分类列表
-                    renderCategoryCheckboxes();
+                    loadCategories();  // 加载分类列表（会自动调用renderCategoryCheckboxes）
                 }
             } catch (error) {
                 console.error('Failed to get category suggestions:', error);
