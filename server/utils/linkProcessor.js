@@ -83,7 +83,7 @@ class LinkProcessor {
   }
 
   /**
-   * 处理小红书链接 - 使用ScrapeOps API
+   * 处理小红书链接 - 使用ScrapeOps Proxy API
    */
   static async handleXiaohongshu(url) {
     try {
@@ -92,33 +92,36 @@ class LinkProcessor {
         throw new Error('SCRAPEOPS_API_KEY not configured');
       }
 
-      // 使用ScrapeOps API获取页面内容
-      const scrapeOpsUrl = 'https://api.scrapeops.io/v1/scraper/';
-      const response = await axios.get(scrapeOpsUrl, {
+      // 使用ScrapeOps Proxy API获取页面内容
+      const proxyUrl = 'https://proxy.scrapeops.io/v1/';
+      const response = await axios.get(proxyUrl, {
         params: {
           api_key: apiKey,
-          url: url,
-          render_javascript: 'true',
-          country: 'cn',
-          timeout: 30000
+          url: url
         },
-        timeout: 40000
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        timeout: 30000
       });
 
-      if (!response.data.status === 'success' || !response.data.html) {
-        throw new Error('Failed to scrape page: ' + (response.data.error || 'Unknown error'));
-      }
-
-      const html = response.data.html;
+      const html = response.data;
       
       // 提取标题
       const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1].replace(' - 小红书', '').trim() : '小红书笔记';
 
-      // 提取描述
-      const descMatch = html.match(/<meta\s+name=['"]description['"\s][^>]*content=['"]([^'"]*)['"][^>]*>/i) ||
-                        html.match(/<meta\s+property=['"]og:description['"\s][^>]*content=['"]([^'"]*)['"][^>]*>/i);
-      const description = descMatch ? descMatch[1] : '';
+      // 提取描述 - 优先使用og:description
+      let description = '';
+      const ogDescMatch = html.match(/<meta\s+property=['"]og:description['"\s][^>]*content=['"]([^'"]*)['"][^>]*>/i);
+      if (ogDescMatch) {
+        description = ogDescMatch[1];
+      } else {
+        const descMatch = html.match(/<meta\s+name=['"]description['"\s][^>]*content=['"]([^'"]*)['"][^>]*>/i);
+        if (descMatch) {
+          description = descMatch[1];
+        }
+      }
 
       // 提取主要内容 - 更全面的选择器
       let content = '';
@@ -163,6 +166,7 @@ class LinkProcessor {
         source: 'xiaohongshu'
       };
     } catch (error) {
+      console.error('Xiaohongshu error:', error.message);
       throw new Error(`Error handling Xiaohongshu link: ${error.message}`);
     }
   }
