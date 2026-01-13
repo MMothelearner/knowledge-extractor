@@ -52,6 +52,18 @@ class KnowledgeEntry {
         LEFT JOIN categories c ON ec.category_id = c.id
         WHERE 1=1
       `;
+      
+      // 如果指定了分类过滤，需要改用INNER JOIN以确保只返回有分类的条目
+      if (filters.categoryIds && filters.categoryIds.length > 0) {
+        query_text = `
+          SELECT ke.*, 
+                 array_agg(json_build_object('id', c.id, 'name', c.name)) as categories
+          FROM knowledge_entries ke
+          INNER JOIN entry_categories ec ON ke.id = ec.entry_id
+          INNER JOIN categories c ON ec.category_id = c.id
+          WHERE 1=1
+        `;
+      }
       const params = [];
       let paramCount = 1;
 
@@ -76,8 +88,12 @@ class KnowledgeEntry {
         paramCount++;
       }
 
-      // 分组
-      query_text += ` GROUP BY ke.id`;
+      // 分组 - 如果使用INNER JOIN需要包括c.id
+      if (filters.categoryIds && filters.categoryIds.length > 0) {
+        query_text += ` GROUP BY ke.id, c.id`;
+      } else {
+        query_text += ` GROUP BY ke.id`;
+      }
 
       // 排序
       if (filters.sortBy === 'title') {
