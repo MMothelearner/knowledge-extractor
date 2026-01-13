@@ -71,7 +71,7 @@ class KnowledgeEntry {
 
       // 分类过滤
       if (filters.categoryIds && filters.categoryIds.length > 0) {
-        query_text += ` AND c.id = ANY($${paramCount}::int[])`;
+        query_text += ` AND ec.category_id = ANY($${paramCount}::int[])`;
         params.push(filters.categoryIds);
         paramCount++;
       }

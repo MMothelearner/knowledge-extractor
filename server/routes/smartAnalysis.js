@@ -119,7 +119,7 @@ router.post('/link', async (req, res) => {
 
     const result = {
       url: url,
-      title: linkContent.title,
+      title: analysis.title || linkContent.title,
       description: linkContent.description,
       contentType: linkContent.type,
       source: linkContent.source,
