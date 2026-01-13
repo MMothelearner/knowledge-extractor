@@ -1,37 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const LLMAnalyzer = require('./llmAnalyzer');
-
-// 使用stealth插件
-puppeteer.use(StealthPlugin());
-
-let browser = null;
-
-// 初始化浏览器
-async function getBrowser() {
-  if (!browser) {
-    try {
-      browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--single-process'
-        ],
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH
-      });
-    } catch (error) {
-      console.error('Failed to launch browser:', error);
-      throw error;
-    }
-  }
-  return browser;
-}
 
 class LinkProcessor {
   /**
@@ -113,110 +83,93 @@ class LinkProcessor {
   }
 
   /**
-   * 处理小红书链接 - 使用Puppeteer执行JavaScript
+   * 处理小红书链接 - 使用ScrapeOps API
    */
   static async handleXiaohongshu(url) {
-    let page = null;
     try {
-      const browser = await getBrowser();
-      page = await browser.newPage();
-      
-      // 设置浏览器上下文
-      await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15');
-      await page.setViewport({ width: 375, height: 812 });
-      
-      // 导航到页面
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-      
-      // 等待内容加载
-      await page.waitForTimeout(2000);
-      
-      // 提取页面信息
-      const pageData = await page.evaluate(() => {
-        // 提取标题
-        const titleEl = document.querySelector('title');
-        const title = titleEl ? titleEl.textContent.replace(' - 小红书', '').trim() : '小红书笔记';
-        
-        // 提取描述
-        const descEl = document.querySelector('meta[name="description"]');
-        const description = descEl ? descEl.getAttribute('content') : '';
-        
-        // 提取笔记文本内容
-        let content = '';
-        
-        // 尝试从各种可能的元素提取内容
-        const selectors = [
-          '.desc',
-          '.content',
-          '[class*="desc"]',
-          '[class*="content"]',
-          'p',
-          'span[class*="text"]'
-        ];
-        
-        for (const selector of selectors) {
-          const elements = document.querySelectorAll(selector);
-          for (const el of elements) {
-            const text = el.textContent.trim();
-            if (text && text.length > 5 && !text.includes('javascript')) {
-              content += text + '\\n';
-            }
-          }
-          if (content.length > 50) break;
-        }
-        
-        return { title, description, content };
+      const apiKey = process.env.SCRAPEOPS_API_KEY;
+      if (!apiKey) {
+        throw new Error('SCRAPEOPS_API_KEY not configured');
+      }
+
+      // 使用ScrapeOps API获取页面内容
+      const scrapeOpsUrl = 'https://api.scrapeops.io/v1/scraper/';
+      const response = await axios.get(scrapeOpsUrl, {
+        params: {
+          api_key: apiKey,
+          url: url,
+          render_javascript: 'true',
+          country: 'cn',
+          timeout: 30000
+        },
+        timeout: 40000
       });
+
+      if (!response.data.status === 'success' || !response.data.html) {
+        throw new Error('Failed to scrape page: ' + (response.data.error || 'Unknown error'));
+      }
+
+      const html = response.data.html;
       
+      // 提取标题
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].replace(' - 小红书', '').trim() : '小红书笔记';
+
+      // 提取描述
+      const descMatch = html.match(/<meta\s+name=['"]description['"\s][^>]*content=['"]([^'"]*)['"][^>]*>/i) ||
+                        html.match(/<meta\s+property=['"]og:description['"\s][^>]*content=['"]([^'"]*)['"][^>]*>/i);
+      const description = descMatch ? descMatch[1] : '';
+
+      // 提取主要内容 - 更全面的选择器
+      let content = '';
+      
+      // 尝试从多个可能的位置提取内容
+      const contentPatterns = [
+        /<div[^>]*class=['"]([^'"]*desc[^'"]*)['"][^>]*>([^<]+)<\/div>/gi,
+        /<div[^>]*class=['"]([^'"]*content[^'"]*)['"][^>]*>([^<]+)<\/div>/gi,
+        /<p[^>]*>([^<]+)<\/p>/gi,
+        /<span[^>]*>([^<]{10,})<\/span>/gi,
+        /<div[^>]*>([^<]{20,})<\/div>/gi
+      ];
+
+      for (const pattern of contentPatterns) {
+        let match;
+        while ((match = pattern.exec(html)) !== null) {
+          const text = (match[2] || match[1] || '').trim();
+          if (text && text.length > 5 && !text.match(/^<|>$/) && !text.match(/javascript|function|var|const/i)) {
+            content += text + '\n';
+          }
+        }
+        if (content.length > 100) break;
+      }
+
+      // 如果没有提取到内容，使用通用方法
+      if (!content.trim()) {
+        const result = this.extractWebpageContent(html, url);
+        return {
+          ...result,
+          type: 'xiaohongshu_post',
+          title: title || result.title,
+          description: description || result.description
+        };
+      }
+
       return {
         type: 'xiaohongshu_post',
-        title: pageData.title,
-        description: pageData.description,
-        content: pageData.content.trim() || pageData.description,
+        title: title,
+        description: description,
+        content: content.trim(),
         url: url,
         source: 'xiaohongshu'
       };
     } catch (error) {
-      console.error('Xiaohongshu processing error:', error);
-      // 失败时，回退到静态爬虫方法
-      try {
-        const response = await axios.get(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-            'Referer': 'https://www.xiaohongshu.com/',
-          },
-          timeout: 15000,
-          maxRedirects: 10
-        });
-        
-        const html = response.data;
-        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-        const title = titleMatch ? titleMatch[1].replace(' - 小红书', '').trim() : '小红书笔记';
-        const descMatch = html.match(/<meta\s+name=['"]description['"][^>]*content=['"]([^'"]*)['"][^>]*>/i);
-        const description = descMatch ? descMatch[1] : '';
-        
-        return {
-          type: 'xiaohongshu_post',
-          title: title,
-          description: description,
-          content: description,
-          url: url,
-          source: 'xiaohongshu'
-        };
-      } catch (fallbackError) {
-        throw new Error(`Error handling Xiaohongshu link: ${error.message}`);
-      }
-    } finally {
-      if (page) {
-        await page.close();
-      }
+      throw new Error(`Error handling Xiaohongshu link: ${error.message}`);
     }
   }
 
-  // ... 其他方法保持不变 ...
-  
+  /**
+   * 处理YouTube链接
+   */
   static async handleYouTube(url) {
     try {
       const response = await axios.get(url, {
@@ -255,6 +208,9 @@ class LinkProcessor {
     }
   }
 
+  /**
+   * 处理微博链接
+   */
   static async handleWeibo(url) {
     try {
       const response = await axios.get(url, {
@@ -292,6 +248,9 @@ class LinkProcessor {
     }
   }
 
+  /**
+   * 处理B站链接
+   */
   static async handleBilibili(url) {
     try {
       const response = await axios.get(url, {
@@ -325,6 +284,9 @@ class LinkProcessor {
     }
   }
 
+  /**
+   * 提取网页内容 - 改进版本
+   */
   static extractWebpageContent(html, url) {
     try {
       // 移除脚本、样式和注释
@@ -343,13 +305,16 @@ class LinkProcessor {
                         cleanHtml.match(/<meta\s+property=['"]og:description['"][^>]*content=['"]([^'"]*)['"]/i);
       const description = descMatch ? descMatch[1] : '';
 
-      // 提取主要文本内容
+      // 提取主要文本内容 - 更全面的选择器
       let content = '';
       const contentSelectors = [
+        // 主要内容容器
         /<article[^>]*>(.+?)<\/article>/gis,
         /<main[^>]*>(.+?)<\/main>/gis,
         /<div[^>]*class=['"][^"]*content[^"]*['"][^>]*>(.+?)<\/div>/gis,
+        // 段落和标题
         /<(p|h[1-6]|li|blockquote)[^>]*>([^<]+)<\/\1>/gi,
+        // 其他文本元素
         /<(div|span)[^>]*class=['"][^"]*text[^"]*['"][^>]*>([^<]+)<\/(div|span)>/gi
       ];
 
@@ -364,31 +329,137 @@ class LinkProcessor {
         }
       }
 
+      // 如果内容太少，尝试提取所有文本
+      if (content.trim().length < 100) {
+        const allText = cleanHtml.replace(/<[^>]+>/g, ' ').trim();
+        const lines = allText.split('\n').filter(line => line.trim().length > 10);
+        content = lines.slice(0, 50).join('\n');
+      }
+
       return {
         type: 'webpage',
         title: title,
         description: description,
-        content: content.trim() || description,
+        content: content.trim() || '无法提取内容',
         url: url
       };
     } catch (error) {
+      throw new Error(`Error extracting webpage content: ${error.message}`);
+    }
+  }
+
+  /**
+   * 处理PDF链接
+   */
+  static async handlePDFLink(data) {
+    return {
+      type: 'pdf',
+      content: '[PDF content - requires processing]',
+      note: 'PDF processing from links not fully implemented'
+    };
+  }
+
+  /**
+   * 从网页内容中提取知识 - 改进版本
+   */
+  static extractKnowledgeFromWebpage(content) {
+    const lines = content.split('\n').filter(line => line.trim().length > 5);
+    
+    const knowledge = [];
+    let currentProblem = '';
+    let currentMethods = [];
+
+    for (const line of lines) {
+      // 检测问题行
+      if (line.match(/^(问题|Q:|Question:|What|How|为什么|怎样|如何|问:|疑问|Why|How to)/i) || 
+          line.match(/[?？]$/) ||
+          line.match(/^(一、|二、|三、|四、|五、|1\.|2\.|3\.|4\.|5\.)/)) {
+        
+        if (currentProblem && currentMethods.length > 0) {
+          knowledge.push({
+            problem: currentProblem,
+            methods: currentMethods
+          });
+        }
+        currentProblem = line;
+        currentMethods = [];
+      } else if (line.match(/^(答案|A:|Answer:|Solution:|方法|步骤|做法|解决|答:|建议|技巧|Tips|Note|要点)/i)) {
+        currentMethods.push(line);
+      } else if (currentProblem && line.trim().length > 5) {
+        currentMethods.push(line);
+      }
+    }
+
+    if (currentProblem && currentMethods.length > 0) {
+      knowledge.push({
+        problem: currentProblem,
+        methods: currentMethods
+      });
+    }
+
+    return knowledge;
+  }
+
+  /**
+   * 使用LLM分析链接内容并生成知识点
+   */
+  static async analyzeLinkWithLLM(linkContent) {
+    try {
+      const analyzer = new LLMAnalyzer();
+      const analysis = await analyzer.analyzeContent(linkContent.content, 'link');
+      
+      // 返回LLM分析结果
+      // LLMAnalyzer 返回的格式:
+      // {
+      //   problem: "问题",
+      //   methods: ["方法1", "方法2"],
+      //   keywords: ["关键词1", "关键词2"],
+      //   summary: "总结",
+      //   mindmap: "思维导图",
+      //   contentType: "类型",
+      //   analyzedAt: "时间"
+      // }
+      
+      // 转换为前端期望的格式
       return {
-        type: 'webpage',
-        title: 'Unknown',
-        description: '',
-        content: 'Unable to extract content',
-        url: url
+        title: linkContent.title,
+        summary: analysis.summary || '',
+        keyPoints: analysis.keywords || [],
+        problems: analysis.problem ? [{
+          problem: analysis.problem,
+          solutions: analysis.methods || []
+        }] : [],
+        learningNotes: analysis.methods || [],
+        tags: analysis.keywords || [],
+        difficulty: '中等',
+        mindmap: analysis.mindmap || '',
+        rawAnalysis: analysis
+      }
+    } catch (error) {
+      console.error('Error analyzing link with LLM:', error);
+      // 返回默认分析结果而不是抛出错误
+      return {
+        title: linkContent.title,
+        summary: '内容分析中...',
+        keyPoints: [],
+        problems: [],
+        learningNotes: [],
+        tags: [],
+        difficulty: '中等'
       };
     }
   }
 
-  static async handlePDFLink(data) {
-    return {
-      type: 'pdf',
-      title: 'PDF Document',
-      content: 'PDF content',
-      url: 'pdf'
-    };
+  /**
+   * 验证URL
+   */
+  static isValidUrl(url) {
+    try {
+      new URL(url);
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 }
 
