@@ -92,8 +92,14 @@ class LinkProcessor {
       const response = await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          'Referer': 'https://www.xiaohongshu.com/',
+          'Cookie': 'xsecappid=xhs; xsectoken=xhs',
         },
-        timeout: 15000
+        timeout: 15000,
+        maxRedirects: 10,
+        followRedirects: true
       });
 
       const html = response.data;
@@ -103,25 +109,26 @@ class LinkProcessor {
       const title = titleMatch ? titleMatch[1].replace(' - 小红书', '').trim() : '小红书笔记';
 
       // 提取描述（小红书的内容通常在meta标签中）
-      const descMatch = html.match(/<meta\s+name=['"]description['"][^>]*content=['"]([^'"]*)['"]/i);
-      const description = descMatch ? descMatch[1] : '';
+      const descMatch = html.match(/<meta\s+name=['"](description|og:description)['"][^>]*content=['"](([^'"]*))['"]/i);
+      const description = descMatch ? (descMatch[2] || descMatch[1]) : '';
 
       // 提取主要内容
       let content = '';
       
       // 尝试从多个可能的位置提取内容
       const contentPatterns = [
-        /<div[^>]*class=['"]desc[^>]*>([^<]+)<\/div>/gi,
-        /<div[^>]*class=['"]content[^>]*>([^<]+)<\/div>/gi,
+        /<div[^>]*class=['"]( desc|content)[^>]*>([^<]+)<\/div>/gi,
+        /<div[^>]*class=['"]( content)[^>]*>([^<]+)<\/div>/gi,
         /<p[^>]*>([^<]+)<\/p>/gi,
-        /<span[^>]*class=['"][^"]*text[^"]*['"][^>]*>([^<]+)<\/span>/gi
+        /<span[^>]*class=['"]([^'"]*text[^'"]*)['"][^>]*>([^<]+)<\/span>/gi
       ];
 
       for (const pattern of contentPatterns) {
         let match;
         while ((match = pattern.exec(html)) !== null) {
-          const text = match[1].trim();
-          if (text && text.length > 5) {
+          // 根据不同的正则表达式，文本可能在不同的位置
+          const text = (match[2] || match[1] || '').trim();
+          if (text && text.length > 5 && !text.match(/^<|>$/)) {
             content += text + '\n';
           }
         }
