@@ -1070,81 +1070,135 @@
         function generateDrawerContent(data) {
             let html = '';
             
-            // 1. 概览区域
-            html += '<div class="overview-section">';
-            html += '<div class="overview-title">📌 核心要点</div>';
-            
-            // 总结
-            if (data.summary) {
-                html += '<div class="summary-box">';
-                html += '<div class="summary-item">' + escapeHtml(data.summary) + '</div>';
+            // 检查是否是新的详细分析格式
+            if (data.fullContent && data.contentType === 'detailed_analysis') {
+                // 新格式：直接显示Markdown内容
+                html += '<div class="detailed-analysis-content">';
+                html += convertMarkdownToHtml(data.fullContent);
                 html += '</div>';
-            }
-            
-            // 核心问题
-            if (data.problem) {
-                html += '<div class="summary-box">';
-                html += '<div class="summary-item"><strong>❓ 核心问题：</strong> ' + escapeHtml(data.problem) + '</div>';
-                html += '</div>';
-            }
-            
-            // 关键词
-            const keywords = data.keywords || data.keyPoints || data.tags || [];
-            if (keywords && keywords.length > 0) {
-                html += '<div class="summary-box">';
-                html += '<div class="summary-item"><strong>🏷️ 关键词：</strong></div>';
-                keywords.forEach(k => {
-                    html += '<span style="display: inline-block; background: #e8f0ff; color: #667eea; padding: 4px 12px; border-radius: 20px; margin-right: 8px; margin-bottom: 8px; font-size: 0.9em;">' + escapeHtml(k) + '</span>';
-                });
-                html += '</div>';
-            }
-            
-            html += '</div>';
-            
-            // 2. 思维导图
-            if (data.mindmap) {
-                html += '<div class="mindmap-section">';
-                html += '<div class="overview-title mindmap-toggle" onclick="toggleMindmap()">🧠 思维导图 [展开]</div>';
-                html += '<div class="mindmap-content hidden" id="mindmapContent"><pre>' + escapeHtml(data.mindmap) + '</pre></div>';
-                html += '</div>';
-            }
-            
-            // 3. 时间轴笔记
-            if (data.notes && data.notes.length > 0) {
-                html += '<div class="timeline-section">';
-                html += '<div class="overview-title">📖 笔记内容</div>';
+            } else {
+                // 旧格式：使用结构化显示
+                // 1. 概览区域
+                html += '<div class="overview-section">';
+                html += '<div class="overview-title">📌 核心要点</div>';
                 
-                data.notes.forEach(note => {
-                    const typeIcon = getTypeIcon(note.type);
-                    const cardClass = 'note-card ' + (note.type || 'method');
+                // 总结
+                if (data.summary) {
+                    html += '<div class="summary-box">';
+                    html += '<div class="summary-item">' + escapeHtml(data.summary) + '</div>';
+                    html += '</div>';
+                }
+                
+                // 核心问题
+                if (data.problem) {
+                    html += '<div class="summary-box">';
+                    html += '<div class="summary-item"><strong>❓ 核心问题：</strong> ' + escapeHtml(data.problem) + '</div>';
+                    html += '</div>';
+                }
+                
+                // 关键词
+                const keywords = data.keywords || data.keyPoints || data.tags || [];
+                if (keywords && keywords.length > 0) {
+                    html += '<div class="summary-box">';
+                    html += '<div class="summary-item"><strong>🏷️ 关键词：</strong></div>';
+                    keywords.forEach(k => {
+                        html += '<span style="display: inline-block; background: #e8f0ff; color: #667eea; padding: 4px 12px; border-radius: 20px; margin-right: 8px; margin-bottom: 8px; font-size: 0.9em;">' + escapeHtml(k) + '</span>';
+                    });
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+                
+                // 2. 思维导图
+                if (data.mindmap) {
+                    html += '<div class="mindmap-section">';
+                    html += '<div class="overview-title mindmap-toggle" onclick="toggleMindmap()">🧠 思维导图 [展开]</div>';
+                    html += '<div class="mindmap-content hidden" id="mindmapContent"><pre>' + escapeHtml(data.mindmap) + '</pre></div>';
+                    html += '</div>';
+                }
+                
+                // 3. 时间轴笔记
+                if (data.notes && data.notes.length > 0) {
+                    html += '<div class="timeline-section">';
+                    html += '<div class="overview-title">📖 笔记内容</div>';
                     
-                    html += '<div class="' + cardClass + '">';
-                    html += '<div class="note-header">';
-                    html += '<span class="note-timestamp">[' + escapeHtml(note.timestamp || '00:00') + ']</span>';
-                    html += '<span class="note-type-icon">' + typeIcon + '</span>';
-                    html += '<span class="note-title">' + escapeHtml(note.title || '笔记') + '</span>';
+                    data.notes.forEach(note => {
+                        const typeIcon = getTypeIcon(note.type);
+                        const cardClass = 'note-card ' + (note.type || 'method');
+                        
+                        html += '<div class="' + cardClass + '">';
+                        html += '<div class="note-header">';
+                        html += '<span class="note-timestamp">[' + escapeHtml(note.timestamp || '00:00') + ']</span>';
+                        html += '<span class="note-type-icon">' + typeIcon + '</span>';
+                        html += '<span class="note-title">' + escapeHtml(note.title || '笔记') + '</span>';
+                        html += '</div>';
+                        html += '<div class="note-content">' + escapeHtml(note.content || '') + '</div>';
+                        html += '</div>';
+                    });
+                    
                     html += '</div>';
-                    html += '<div class="note-content">' + escapeHtml(note.content || '') + '</div>';
-                    html += '</div>';
-                });
+                }
                 
-                html += '</div>';
+                // 4. 解决方法（如果没有notes）
+                if ((!data.notes || data.notes.length === 0) && data.methods && data.methods.length > 0) {
+                    html += '<div class="timeline-section">';
+                    html += '<div class="overview-title">💡 解决方法</div>';
+                    
+                    data.methods.forEach((method, index) => {
+                        html += '<div class="note-card">';
+                        html += '<div class="note-title">方法 ' + (index + 1) + '</div>';
+                        html += '<div class="note-content">' + escapeHtml(method) + '</div>';
+                        html += '</div>';
+                    });
+                    
+                    html += '</div>';
+                }
             }
             
-            // 4. 解决方法（如果没有notes）
-            if ((!data.notes || data.notes.length === 0) && data.methods && data.methods.length > 0) {
-                html += '<div class="timeline-section">';
-                html += '<div class="overview-title">💡 解决方法</div>';
-                
-                data.methods.forEach((method, index) => {
-                    html += '<div class="note-card">';
-                    html += '<div class="note-title">方法 ' + (index + 1) + '</div>';
-                    html += '<div class="note-content">' + escapeHtml(method) + '</div>';
-                    html += '</div>';
-                });
-                
-                html += '</div>';
-            }
+            return html;
+        }
+        
+        // Markdown转HTML
+        function convertMarkdownToHtml(markdown) {
+            let html = markdown;
+            
+            // 转换标题
+            html = html.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
+            
+            // 转换加粗
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+            
+            // 转换斜体
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+            
+            // 转换列表
+            html = html.replace(/^\* (.*?)$/gm, '<li>$1</li>');
+            html = html.replace(/^- (.*?)$/gm, '<li>$1</li>');
+            html = html.replace(/^\d+\. (.*?)$/gm, '<li>$1</li>');
+            
+            // 转换代码块
+            html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            html = html.replace(/`(.*?)`/g, '<code>$1</code>');
+            
+            // 转换换行
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = html.replace(/\n/g, '<br>');
+            
+            // 包装段落
+            html = '<p>' + html + '</p>';
+            
+            // 添加样式
+            html = html.replace(/<h1>/g, '<h1 style="font-size: 1.8em; margin: 20px 0 10px 0; color: #333;">');
+            html = html.replace(/<h2>/g, '<h2 style="font-size: 1.5em; margin: 18px 0 10px 0; color: #444;">');
+            html = html.replace(/<h3>/g, '<h3 style="font-size: 1.2em; margin: 15px 0 8px 0; color: #555;">');
+            html = html.replace(/<strong>/g, '<strong style="color: #667eea; font-weight: 600;">');
+            html = html.replace(/<code>/g, '<code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: monospace;">');
+            html = html.replace(/<pre>/g, '<pre style="background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto;">');
+            html = html.replace(/<li>/g, '<li style="margin-left: 20px; margin-bottom: 5px;">');
             
             return html;
         }

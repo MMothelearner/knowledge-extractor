@@ -1,6 +1,7 @@
 /**
  * LLM分析器 - 支持多个LLM提供商（DeepSeek、OpenAI等）
  * 默认使用DeepSeek API
+ * 使用优化的提示词进行深度内容分析
  */
 
 const axios = require('axios');
@@ -45,7 +46,7 @@ class LLMAnalyzer {
     const payload = {
       model: this.model,
       messages: messages,
-      max_tokens: 4096,
+      max_tokens: 8192,
       temperature: 0.7
     };
 
@@ -60,7 +61,7 @@ class LLMAnalyzer {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`
         },
-        timeout: 30000
+        timeout: 60000
       });
 
       return response.data.choices[0].message.content;
@@ -71,103 +72,165 @@ class LLMAnalyzer {
   }
 
   /**
-   * 分析内容 - 识别问题和方法
+   * 深度内容分析 - 使用优化的提示词
    */
   async analyzeContent(content, contentType = 'text') {
     try {
-      // 第一步：识别问题、主题和方法
-      const analysisPrompt = `你是一个专业的知识提炼专家。请分析以下${contentType}内容，并按照要求输出结构化的知识。
+      // 优化的提示词 - 深度内容分析
+      const analysisPrompt = `# Role
+你是一位拥有极强逻辑归纳能力的"深度内容分析师"。你擅长从冗长的视频脚本中剥离废话，通过降噪处理，提炼出高密度的核心信息。
 
-内容：
+# Task
+请阅读我提供的视频内容（或字幕），执行以下操作：
+
+1.  **结构重组**：识别视频的逻辑脉络，将其划分为明确的章节。
+2.  **干货提取**：针对每一章节，提取以下类型的"干货"信息：
+    * 具体的操作步骤或方法论。
+    * 核心概念的定义及其底层逻辑。
+    * 提到的关键工具、资源或数据。
+    * 作者的独家洞察或反直觉的结论。
+3.  **降噪处理**：完全过滤掉以下内容：
+    * 开场白、自我介绍、求关注。
+    * 重复的强调语气、口语废话。
+    * 与核心主题无关的举例或玩笑。
+
+# Constraints
+* **颗粒度控制**：保留所有关键细节，但禁止照搬原话。使用陈述句进行概括。
+* **客观中立**：不要加入你的主观评价，只复述作者的观点。
+* **完整性**：无论视频多长，必须覆盖从头到尾的所有核心点，不得遗漏。
+
+# Output Format
+请严格按照以下 Markdown 格式输出：
+
+## [时间戳范围] 章节标题
+- **核心论点**：用一句话概括本节主旨。
+- **关键细节**：
+  - [概念/方法]：具体的解释或步骤（如涉及步骤，请使用 1. 2. 3. 列表）。
+  - [工具/案例]：提到的具体对象。
+  - [金句/结论]：作者的总结性陈述。
+
+(请对视频的每一个逻辑段落重复上述结构)
+
+# Summary
+在最后，请用 3 个要点总结全视频对观众最大的价值是什么。
+
+---
+
+现在，请分析以下内容：
+
 ${content}
 
-请按照以下JSON格式输出，不要包含任何其他文字：
-{
-  "problem": "这个内容解决的核心问题是什么？（一句话，简洁准确，不超过20字）",
-  "topic": "此内容所属的主题领域（如：英语语法、英语单词、英语听力、英语阅读、英语写作、英语口语等）",
-  "methods": ["具体方法1", "具体方法2", "具体方法3"],
-  "keywords": ["关键词1", "关键词2", "关键词3"],
-  "summary": "内容总结（2-3句话，精炼准确）"
-}
-
-要求：
-1. problem字段必须简洁明确，不超过20个字
-2. topic字段应该是明确的主题领域名称
-3. methods数组中每个方法都要具体可操作，不要有废话
-4. keywords应该是最核心的3-5个关键词
-5. summary要精炼，不要冗长`;
+请严格按照上述格式输出分析结果。`;
 
       const analysisResponse = await this.invokeLLM(
         [{ role: 'user', content: analysisPrompt }]
       );
 
-      let analysis;
-      try {
-        analysis = JSON.parse(analysisResponse);
-      } catch (e) {
-        // 如果JSON解析失败，尝试提取JSON
-        const jsonMatch = analysisResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          analysis = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('Failed to parse LLM response as JSON');
-        }
-      }
+      // 解析响应 - 提取结构化信息
+      const analysis = this.parseDetailedAnalysis(analysisResponse);
 
-      // 验证必要字段
-      if (!analysis.problem || !analysis.methods || !analysis.keywords || !analysis.summary) {
-        throw new Error('Invalid analysis response: missing required fields');
-      }
-
-      // 生成友好的标题：[主题]：[问题]
-      const topic = analysis.topic || '英语学习';
-      const generatedTitle = `${topic}：${analysis.problem}`;
-
-      // 第二步：生成思维导图
-      const mindmapPrompt = `基于以下内容，生成一个Mermaid格式的思维导图：
-
-问题：${analysis.problem}
-方法：${analysis.methods.join('、')}
-
-请生成Mermaid思维导图代码（只输出代码，不要其他文字）：
-mindmap
-  root((${analysis.problem}))
-    方法
-      ${analysis.methods.map((m, i) => `方法${i + 1}: ${m}`).join('\n      ')}
-    关键点
-      ${analysis.keywords.map(k => `${k}`).join('\n      ')}`;
-
-      let mindmap = '';
-      try {
-        mindmap = await this.invokeLLM([{ role: 'user', content: mindmapPrompt }]);
-        // 清理mindmap输出
-        mindmap = mindmap.replace(/```mermaid\n?/g, '').replace(/```\n?/g, '').trim();
-      } catch (error) {
-        console.warn('Failed to generate mindmap:', error);
-        // 使用默认格式
-        mindmap = `mindmap
-  root((${analysis.problem}))
-    方法
-${analysis.methods.map((m, i) => `      方法${i + 1}: ${m}`).join('\n')}
-    关键点
-${analysis.keywords.map(k => `      ${k}`).join('\n')}`;
-      }
-
-      return {
-        title: generatedTitle,
-        problem: analysis.problem,
-        topic: analysis.topic || '英语学习',
-        methods: analysis.methods,
-        keywords: analysis.keywords,
-        summary: analysis.summary,
-        mindmap: mindmap,
-        contentType: contentType,
-        analyzedAt: new Date().toISOString()
-      };
+      return analysis;
     } catch (error) {
       console.error('Content Analysis Error:', error);
       throw error;
     }
+  }
+
+  /**
+   * 解析详细分析结果
+   */
+  parseDetailedAnalysis(response) {
+    try {
+      // 提取章节
+      const sections = [];
+      const sectionRegex = /^##\s+\[([^\]]+)\]\s+(.+)$/gm;
+      let match;
+
+      while ((match = sectionRegex.exec(response)) !== null) {
+        const timeRange = match[1];
+        const title = match[2];
+        sections.push({
+          timeRange,
+          title,
+          content: ''
+        });
+      }
+
+      // 提取摘要（最后的3个要点）
+      const summaryMatch = response.match(/# Summary\n([\s\S]*?)$/i) || 
+                          response.match(/## Summary\n([\s\S]*?)$/i) ||
+                          response.match(/### Summary\n([\s\S]*?)$/i);
+      
+      let summary = '';
+      if (summaryMatch) {
+        summary = summaryMatch[1].trim();
+      }
+
+      // 提取核心问题（从第一个章节标题推断）
+      const firstSectionMatch = response.match(/^##\s+\[([^\]]+)\]\s+(.+)$/m);
+      const problem = firstSectionMatch ? firstSectionMatch[2] : '内容分析';
+
+      // 提取关键词（从内容中推断）
+      const keywords = this.extractKeywords(response);
+
+      return {
+        title: problem,
+        problem: problem,
+        topic: this.detectTopic(response),
+        sections: sections,
+        fullContent: response,
+        summary: summary,
+        keywords: keywords,
+        contentType: 'detailed_analysis',
+        analyzedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Parse Analysis Error:', error);
+      // 返回原始内容作为备选
+      return {
+        title: '内容分析',
+        problem: '内容分析',
+        topic: '未知',
+        sections: [],
+        fullContent: response,
+        summary: response.substring(0, 200),
+        keywords: [],
+        contentType: 'detailed_analysis',
+        analyzedAt: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * 检测主题
+   */
+  detectTopic(content) {
+    const topics = ['英语语法', '英语词汇', '英语听力', '英语阅读', '英语写作', '英语口语', '英语学习'];
+    for (const topic of topics) {
+      if (content.includes(topic)) {
+        return topic;
+      }
+    }
+    return '英语学习';
+  }
+
+  /**
+   * 提取关键词
+   */
+  extractKeywords(content) {
+    // 简单的关键词提取 - 查找加粗的词
+    const boldRegex = /\*\*([^*]+)\*\*/g;
+    const keywords = [];
+    let match;
+    
+    while ((match = boldRegex.exec(content)) !== null) {
+      const word = match[1];
+      if (word.length > 2 && word.length < 20 && !word.includes('：')) {
+        keywords.push(word);
+      }
+    }
+
+    return keywords.slice(0, 10); // 最多10个关键词
   }
 
   /**
