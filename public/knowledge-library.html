@@ -437,7 +437,6 @@
                 min-width: 80px;
             }
         }
-    </style>
 
         /* 批量删除控制栏样式 */
         .batch-controls {
@@ -531,6 +530,8 @@
         .entry-card.batch-mode {
             padding-left: 50px;
         }
+
+    </style>
 </head>
 <body>
     <div class="library-container">
@@ -600,6 +601,7 @@
                 <button class="batch-btn cancel" onclick="cancelBatchMode()">取消</button>
             </div>
         </div>
+
         <!-- 条目列表 -->
         <div class="entries-list" id="entriesList">
             <div class="loading">
@@ -708,7 +710,7 @@
 
             entriesList.innerHTML = pageEntries.map(entry => `
                 <div class="entry-card" id="entry-${entry.id}" data-entry-id="${entry.id}">
-                    ${isBatchMode ? `<input type="checkbox" class="entry-checkbox" data-entry-id="${entry.id}" onchange="updateSelectedCount()">` : ''}
+                    ${isBatchMode ? `<input type="checkbox" class="entry-checkbox" data-entry-id="${entry.id}" onchange="updateSelectedCount()">` : ""}
                     <div class="entry-header">
                         <h3 class="entry-title">${escapeHtml(entry.title)}</h3>
                         <span class="entry-type">${entry.sourceType === 'link' ? '🔗 链接' : '📄 文档'}</span>
@@ -964,7 +966,7 @@
             }
         }
 
-        // 在renderEntries函数后添加右键菜单进入批量模式
+        // 右键菜单进入批量模式
         document.addEventListener('contextmenu', (e) => {
             if (e.target.closest('.entry-card') && !isBatchMode) {
                 e.preventDefault();
@@ -972,7 +974,7 @@
             }
         });
 
-        // 添加快捷键支持：Ctrl+B 进入批量模式
+        // 快捷键支持：Ctrl+B 进入批量模式
         document.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
                 e.preventDefault();
@@ -983,6 +985,8 @@
                 }
             }
         });
+
+
         async function deleteEntry(entryId) {
             if (!confirm('确定要删除这个条目吗？')) return;
 
