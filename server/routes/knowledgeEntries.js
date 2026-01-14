@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const KnowledgeEntry = require('../models/KnowledgeEntry');
+const CategoryRecommender = require('../utils/CategoryRecommender');
+
+const categoryRecommender = new CategoryRecommender();
 
 // 获取所有知识库条目（支持搜索、筛选、排序）
 router.get('/', async (req, res) => {
@@ -50,52 +53,33 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// 自动分类建议
+// 自动分类建议 - 使用智能推荐系统
 router.post('/suggest-categories', async (req, res) => {
   try {
-    const { title, summary, llmAnalysis } = req.body;
+    const { title, summary, llmAnalysis, contentType, source } = req.body;
 
-    // 分类关键词映射
-    const categoryKeywords = {
-      1: ['语法', 'grammar', 'tense', 'verb', '动词', '时态', '句式', '结构'],
-      2: ['词汇', 'vocabulary', 'word', '单词', '词汇', '短语', 'phrase'],
-      3: ['听力', 'listening', 'audio', '音频', '听', '发音'],
-      4: ['阅读', 'reading', 'read', '阅读', '文章', 'article'],
-      5: ['写作', 'writing', 'write', '写', '作文', 'essay'],
-      6: ['口语', 'speaking', 'speak', '说', '对话', 'conversation'],
-      7: ['教学', 'teaching', 'teach', '教学', '方法', 'method', '课堂'],
-      8: ['教材', 'textbook', '教材', '教科书', '教学资源'],
-      9: ['用法', 'usage', '用法', '使用', '应用'],
-      10: ['人群', 'audience', '人群', '学生', '初学者', 'beginner', '高级'],
-      11: ['考试', 'exam', 'test', '考试', 'FCE', 'IELTS', 'TOEFL']
-    };
-
-    const text = `${title} ${summary} ${JSON.stringify(llmAnalysis || {})}`.toLowerCase();
-    const suggestedCategories = [];
-
-    // 计算每个分类的匹配分数
-    const categoryScores = {};
-    for (const [catId, keywords] of Object.entries(categoryKeywords)) {
-      let score = 0;
-      for (const keyword of keywords) {
-        if (text.includes(keyword.toLowerCase())) {
-          score += 1;
-        }
-      }
-      if (score > 0) {
-        categoryScores[catId] = score;
-      }
-    }
-
-    // 获取得分最高的3个分类
-    const topCategories = Object.entries(categoryScores)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([catId]) => parseInt(catId));
+    const result = categoryRecommender.recommendCategories(
+      title,
+      summary,
+      llmAnalysis,
+      contentType,
+      source
+    );
 
     res.json({
       success: true,
-      suggestedCategories: topCategories
+      suggestedCategories: result.recommended.map(cat => ({
+        categoryId: cat.categoryId,
+        categoryName: cat.categoryName,
+        categoryNameEn: cat.categoryNameEn,
+        score: cat.score,
+        confidence: cat.confidence
+      })),
+      details: {
+        totalRecommended: result.recommendedCount,
+        totalCategories: result.totalCategories,
+        allScores: result.allScores
+      }
     });
   } catch (error) {
     console.error('Error suggesting categories:', error);
