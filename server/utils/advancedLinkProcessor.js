@@ -391,27 +391,78 @@ class AdvancedLinkProcessor {
    */
   static async handleBilibili(url) {
     try {
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': 'https://www.bilibili.com/'
-        },
-        timeout: 15000
-      });
+      // 首先尝试使用ScrapeOps代理获取动态内容
+      let html = '';
+      const scrapeOpsApiKey = process.env.SCRAPEOPS_API_KEY;
+      
+      if (scrapeOpsApiKey) {
+        try {
+          const scrapeOpsUrl = `https://api.scrapeops.io/v1/scraper/?api_key=${scrapeOpsApiKey}&url=${encodeURIComponent(url)}&render_javascript=true`;
+          const proxyResponse = await axios.get(scrapeOpsUrl, { timeout: 30000 });
+          html = proxyResponse.data;
+        } catch (proxyError) {
+          console.warn('ScrapeOps代理失败，尝试直接请求:', proxyError.message);
+          // 回退到直接请求
+          const response = await axios.get(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Referer': 'https://www.bilibili.com/',
+              'Accept-Language': 'zh-CN,zh;q=0.9'
+            },
+            timeout: 15000
+          });
+          html = response.data;
+        }
+      } else {
+        // 没有ScrapeOps密钥，使用直接请求
+        const response = await axios.get(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://www.bilibili.com/',
+            'Accept-Language': 'zh-CN,zh;q=0.9'
+          },
+          timeout: 15000
+        });
+        html = response.data;
+      }
 
-      const html = response.data;
+      // 提取标题
+      let title = this.extractMetaContent(html, 'og:title') || 
+                  this.extractTitle(html) || 
+                  'Bilibili视频';
+      
+      // 清理标题
+      if (title.includes('_')) {
+        title = title.split('_')[0].trim();
+      }
 
-      const title = this.extractMetaContent(html, 'og:title') || 
-                    this.extractTitle(html) || 
-                    'Bilibili视频';
+      // 提取描述
+      let description = this.extractMetaContent(html, 'og:description', 'description') || '';
 
-      const description = this.extractMetaContent(html, 'og:description', 'description') || '';
-
+      // 提取视频ID
       const videoIdMatch = url.match(/\/video\/(BV[^/?]+)/);
       const videoId = videoIdMatch ? videoIdMatch[1] : '';
 
+      // 提取JSON-LD内容
       const jsonLdContent = this.extractJsonLd(html);
-      const content = (description + '\n' + jsonLdContent).trim();
+      
+      // 尝试从initial_state中提取更多信息
+      let initialStateContent = '';
+      const initialStateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({[^;]+});/);
+      if (initialStateMatch) {
+        try {
+          const initialState = JSON.parse(initialStateMatch[1]);
+          if (initialState.videoData) {
+            const videoData = initialState.videoData;
+            if (videoData.title) title = videoData.title;
+            if (videoData.desc) description = videoData.desc;
+          }
+        } catch (e) {
+          // 忽略JSON解析错误
+        }
+      }
+
+      const content = (description + '\n' + jsonLdContent + '\n' + initialStateContent).trim();
 
       return {
         type: 'bilibili_video',
