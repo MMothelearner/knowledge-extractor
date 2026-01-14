@@ -1021,18 +1021,32 @@
 
         // 打开沉浸式阅读界面
         function openImmersiveDrawer(analysisData) {
+            // 数据验证
+            if (!analysisData || typeof analysisData !== 'object') {
+                console.error('Invalid analysis data:', analysisData);
+                return;
+            }
+            
             currentDrawerData = analysisData;
             
             // 更新标题
-            document.getElementById('drawerTitle').textContent = analysisData.title || analysisData.problem || '分析结果';
+            const titleElement = document.getElementById('drawerTitle');
+            if (titleElement) {
+                titleElement.textContent = analysisData.title || analysisData.problem || '分析结果';
+            }
             
             // 生成内容
             const content = generateDrawerContent(analysisData);
-            document.getElementById('drawerContent').innerHTML = content;
+            const contentElement = document.getElementById('drawerContent');
+            if (contentElement) {
+                contentElement.innerHTML = content;
+            }
             
             // 显示抽屉
-            document.getElementById('immersiveDrawer').classList.add('open');
-            document.getElementById('drawerOverlay').classList.add('open');
+            const drawer = document.getElementById('immersiveDrawer');
+            const overlay = document.getElementById('drawerOverlay');
+            if (drawer) drawer.classList.add('open');
+            if (overlay) overlay.classList.add('open');
             
             // 禁用主界面滚动
             document.body.style.overflow = 'hidden';
@@ -1303,9 +1317,10 @@
             element.innerHTML = html;
             
             // 自动打开沉浸式阅读界面
-            if (data.analysis || data) {
-                const analysisData = data.analysis || data;
-                openImmersiveDrawer(analysisData);
+            if (analysis && Object.keys(analysis).length > 0) {
+                openImmersiveDrawer(analysis);
+            } else {
+                console.warn('No analysis data to display in drawer');
             }
         }
 
