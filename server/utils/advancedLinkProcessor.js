@@ -214,7 +214,19 @@ class AdvancedLinkProcessor {
 
       const description = this.extractMetaContent(html, 'og:description', 'description') || '';
       const jsonLdContent = this.extractJsonLd(html);
-      const content = (description + '\n' + jsonLdContent).trim();
+      
+      // 如果description为空，尝试从纯文本中提取
+      let plainText = '';
+      if (!description && !jsonLdContent) {
+        plainText = this.extractPlainText(html);
+      }
+      
+      // 构建content - 优先使用title和description
+      const content = (title + '\n' + description + '\n' + jsonLdContent + '\n' + plainText)
+        .split('\n')
+        .filter(line => line.trim())
+        .join('\n')
+        .trim();
 
       return {
         type: 'douyin_video',
@@ -308,7 +320,19 @@ class AdvancedLinkProcessor {
       const videoId = videoIdMatch ? videoIdMatch[1] : '';
 
       const jsonLdContent = this.extractJsonLd(html);
-      const content = (description + '\n' + jsonLdContent).trim();
+      
+      // 如果description为空，尝试从纯文本中提取
+      let plainText = '';
+      if (!description && !jsonLdContent) {
+        plainText = this.extractPlainText(html);
+      }
+      
+      // 构建content - 优先使用title和description
+      const content = (title + '\n' + description + '\n' + jsonLdContent + '\n' + plainText)
+        .split('\n')
+        .filter(line => line.trim())
+        .join('\n')
+        .trim();
 
       return {
         type: 'youtube_video',

@@ -1,31 +1,64 @@
 const axios = require('axios');
 
-const testUrls = [
-  { url: 'https://www.bilibili.com/video/BV1jJ411a7pL', name: 'Bilibili' },
-  { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', name: 'YouTube' },
-  { url: 'https://xhslink.com/o/n9cg7NeWIf', name: 'Xiaohongshu' },
+const testLinks = [
+  {
+    name: 'Bilibili',
+    url: 'https://www.bilibili.com/video/BV1S94y1y7WN'
+  },
+  {
+    name: 'YouTube',
+    url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+  },
+  {
+    name: '小红书',
+    url: 'https://www.xiaohongshu.com/explore/6524f5e30000000014000d2d'
+  }
 ];
 
-async function testAll() {
-  for (const test of testUrls) {
-    console.log(`\n测试 ${test.name}: ${test.url}`);
-    try {
-      const response = await axios.post('http://localhost:3000/api/smart-analysis/link', {
-        url: test.url
-      }, { timeout: 30000 });
-      
-      if (response.data.success) {
-        console.log('✓ 成功');
-        console.log('  标题:', response.data.data.title.substring(0, 60));
-        console.log('  来源:', response.data.data.source);
-        console.log('  分析:', response.data.data.analysis.problem ? '✓ 有' : '✗ 无');
-      } else {
-        console.log('✗ 失败:', response.data.error);
-      }
-    } catch (error) {
-      console.log('✗ 错误:', error.message);
+async function testLink(link) {
+  try {
+    console.log(`\n📝 测试 ${link.name}: ${link.url}`);
+    
+    const response = await axios.post('http://localhost:3000/api/smart-analysis/link', 
+      { url: link.url },
+      { timeout: 180000 }
+    );
+    
+    if (response.data.success) {
+      const data = response.data.data;
+      console.log(`✅ 成功`);
+      console.log(`   标题: ${data.title.substring(0, 50)}...`);
+      console.log(`   内容长度: ${data.content.length} 字符`);
+      console.log(`   来源: ${data.source}`);
+      console.log(`   分析状态: ${data.analysis ? '已分析' : '未分析'}`);
+      return true;
+    } else {
+      console.log(`❌ 失败: ${response.data.error}`);
+      return false;
     }
+  } catch (error) {
+    console.log(`❌ 错误: ${error.message}`);
+    return false;
   }
 }
 
-testAll();
+async function runTests() {
+  console.log('🚀 开始测试所有平台...\n');
+  
+  let passed = 0;
+  let failed = 0;
+  
+  for (const link of testLinks) {
+    const result = await testLink(link);
+    if (result) passed++;
+    else failed++;
+    
+    // 等待2秒再进行下一个测试
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  
+  console.log(`\n📊 测试结果: ${passed}/${testLinks.length} 通过`);
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+runTests();
