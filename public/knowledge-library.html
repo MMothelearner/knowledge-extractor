@@ -438,6 +438,99 @@
             }
         }
     </style>
+
+        /* 批量删除控制栏样式 */
+        .batch-controls {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+        }
+
+        .batch-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-weight: 500;
+            color: #856404;
+        }
+
+        .batch-info input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .batch-info label {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .selected-count {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .batch-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        .batch-btn.delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .batch-btn.delete:hover {
+            opacity: 0.9;
+        }
+
+        .batch-btn.cancel {
+            background: #6c757d;
+            color: white;
+        }
+
+        .batch-btn.cancel:hover {
+            opacity: 0.9;
+        }
+
+        /* 条目卡片复选框 */
+        .entry-card {
+            position: relative;
+        }
+
+        .entry-checkbox {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .entry-card.selected {
+            background: #e7f3ff;
+            border-color: #667eea;
+        }
+
+        .entry-card.batch-mode {
+            padding-left: 50px;
+        }
 </head>
 <body>
     <div class="library-container">
@@ -494,6 +587,19 @@
             </div>
         </div>
 
+
+        <!-- 批量删除控制栏 -->
+        <div class="batch-controls" id="batchControls" style="display: none;">
+            <div class="batch-info">
+                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                <label for="selectAllCheckbox">全选</label>
+                <span class="selected-count" id="selectedCount">已选择 0 个</span>
+            </div>
+            <div class="batch-actions">
+                <button class="batch-btn delete" onclick="batchDeleteEntries()">🗑 批量删除</button>
+                <button class="batch-btn cancel" onclick="cancelBatchMode()">取消</button>
+            </div>
+        </div>
         <!-- 条目列表 -->
         <div class="entries-list" id="entriesList">
             <div class="loading">
@@ -601,7 +707,8 @@
             const pageEntries = filteredEntries.slice(start, end);
 
             entriesList.innerHTML = pageEntries.map(entry => `
-                <div class="entry-card">
+                <div class="entry-card" id="entry-${entry.id}" data-entry-id="${entry.id}">
+                    ${isBatchMode ? `<input type="checkbox" class="entry-checkbox" data-entry-id="${entry.id}" onchange="updateSelectedCount()">` : ''}
                     <div class="entry-header">
                         <h3 class="entry-title">${escapeHtml(entry.title)}</h3>
                         <span class="entry-type">${entry.sourceType === 'link' ? '🔗 链接' : '📄 文档'}</span>
@@ -749,6 +856,133 @@
         }
 
         // 删除条目
+
+        // 批量操作相关变量
+        let isBatchMode = false;
+        let selectedEntries = [];
+
+        // 进入批量模式
+        function enterBatchMode() {
+            isBatchMode = true;
+            selectedEntries = [];
+            document.getElementById('batchControls').style.display = 'flex';
+            renderEntries();
+        }
+
+        // 取消批量模式
+        function cancelBatchMode() {
+            isBatchMode = false;
+            selectedEntries = [];
+            document.getElementById('batchControls').style.display = 'none';
+            document.getElementById('selectAllCheckbox').checked = false;
+            renderEntries();
+        }
+
+        // 全选/取消全选
+        function toggleSelectAll() {
+            const isChecked = document.getElementById('selectAllCheckbox').checked;
+            const checkboxes = document.querySelectorAll('.entry-checkbox');
+            
+            if (isChecked) {
+                selectedEntries = Array.from(checkboxes).map(cb => parseInt(cb.dataset.entryId));
+            } else {
+                selectedEntries = [];
+            }
+            
+            checkboxes.forEach(cb => cb.checked = isChecked);
+            updateSelectedCount();
+        }
+
+        // 切换单个条目选择
+        function toggleEntrySelection(entryId) {
+            const index = selectedEntries.indexOf(entryId);
+            if (index > -1) {
+                selectedEntries.splice(index, 1);
+            } else {
+                selectedEntries.push(entryId);
+            }
+            
+            const checkbox = document.querySelector(`input[data-entry-id="${entryId}"]`);
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+            }
+            
+            updateSelectedCount();
+        }
+
+        // 更新已选择数量显示
+        function updateSelectedCount() {
+            const checkboxes = document.querySelectorAll('.entry-checkbox:checked');
+            selectedEntries = Array.from(checkboxes).map(cb => parseInt(cb.dataset.entryId));
+            
+            document.getElementById('selectedCount').textContent = `已选择 ${selectedEntries.length} 个`;
+            
+            // 更新条目卡片的selected样式
+            document.querySelectorAll('.entry-card').forEach(card => {
+                const entryId = parseInt(card.dataset.entryId);
+                if (selectedEntries.includes(entryId)) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+            
+            // 更新全选复选框状态
+            const allCheckboxes = document.querySelectorAll('.entry-checkbox');
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            selectAllCheckbox.checked = allCheckboxes.length > 0 && selectedEntries.length === allCheckboxes.length;
+        }
+
+        // 批量删除条目
+        async function batchDeleteEntries() {
+            if (selectedEntries.length === 0) {
+                alert('请先选择要删除的条目');
+                return;
+            }
+            
+            if (!confirm(`确定要删除选中的 ${selectedEntries.length} 个条目吗？此操作不可撤销。`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge-entries/batch-delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ entryIds: selectedEntries })
+                });
+                
+                if (response.ok) {
+                    alert(`成功删除 ${selectedEntries.length} 个条目`);
+                    cancelBatchMode();
+                    loadEntries();
+                } else {
+                    alert('删除失败，请重试');
+                }
+            } catch (error) {
+                console.error('批量删除失败:', error);
+                alert('删除失败');
+            }
+        }
+
+        // 在renderEntries函数后添加右键菜单进入批量模式
+        document.addEventListener('contextmenu', (e) => {
+            if (e.target.closest('.entry-card') && !isBatchMode) {
+                e.preventDefault();
+                enterBatchMode();
+            }
+        });
+
+        // 添加快捷键支持：Ctrl+B 进入批量模式
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                e.preventDefault();
+                if (!isBatchMode) {
+                    enterBatchMode();
+                } else {
+                    cancelBatchMode();
+                }
+            }
+        });
         async function deleteEntry(entryId) {
             if (!confirm('确定要删除这个条目吗？')) return;
 

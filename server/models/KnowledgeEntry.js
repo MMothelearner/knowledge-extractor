@@ -187,6 +187,29 @@ class KnowledgeEntry {
     }
   }
 
+  // 批量删除条目
+  static async batchDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error('Invalid entry IDs');
+    }
+
+    try {
+      // 先删除所有关联的分类
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+      await query(`DELETE FROM entry_categories WHERE entry_id IN (${placeholders})`, ids);
+      
+      // 再删除条目
+      const result = await query(
+        `DELETE FROM knowledge_entries WHERE id IN (${placeholders}) RETURNING *`,
+        ids
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error batch deleting knowledge entries:', error);
+      throw error;
+    }
+  }
+
   // 按分类获取条目数
   static async getCountByCategory() {
     try {

@@ -170,4 +170,33 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+
+// 批量删除知识库条目
+router.post('/batch-delete', async (req, res) => {
+  try {
+    const { entryIds } = req.body;
+    
+    if (!Array.isArray(entryIds) || entryIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'entryIds must be a non-empty array'
+      });
+    }
+    
+    const deletedEntries = await KnowledgeEntry.batchDelete(entryIds);
+    
+    res.json({
+      success: true,
+      message: `Successfully deleted ${deletedEntries.length} entries`,
+      deletedCount: deletedEntries.length,
+      deletedEntries: deletedEntries
+    });
+  } catch (error) {
+    console.error('Error batch deleting knowledge entries:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 module.exports = router;
