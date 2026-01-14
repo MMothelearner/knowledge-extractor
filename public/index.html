@@ -448,15 +448,18 @@
         /* 沉浸式阅读界面 - 抽屉式 */
         .immersive-drawer {
             position: fixed;
-            right: 0;
-            top: 0;
-            width: 60%;
-            height: 100vh;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            width: 85%;
+            max-width: 900px;
+            max-height: 85vh;
             background: white;
-            box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
             z-index: 1000;
             overflow-y: auto;
-            animation: slideInRight 0.3s ease-out;
+            animation: slideInCenter 0.3s ease-out forwards;
             display: none;
         }
 
@@ -464,24 +467,24 @@
             display: block;
         }
 
-        @keyframes slideInRight {
+        @keyframes slideInCenter {
             from {
-                transform: translateX(100%);
+                transform: translate(-50%, -50%) scale(0.95);
                 opacity: 0;
             }
             to {
-                transform: translateX(0);
+                transform: translate(-50%, -50%) scale(1);
                 opacity: 1;
             }
         }
 
-        @keyframes slideOutRight {
+        @keyframes slideOutCenter {
             from {
-                transform: translateX(0);
+                transform: translate(-50%, -50%) scale(1);
                 opacity: 1;
             }
             to {
-                transform: translateX(100%);
+                transform: translate(-50%, -50%) scale(0.95);
                 opacity: 0;
             }
         }
