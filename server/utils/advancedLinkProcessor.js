@@ -99,7 +99,7 @@ class AdvancedLinkProcessor {
    * 使用ScrapeOps获取网页内容
    * 支持动态渲染、反爬虫规则处理、自动重试
    */
-  static async fetchWithScrapeOps(url) {
+  static async fetchWithScrapeOps(url, siteType = null) {
     const scrapeOpsApiKey = process.env.SCRAPEOPS_API_KEY;
     
     if (!scrapeOpsApiKey) {
@@ -112,16 +112,34 @@ class AdvancedLinkProcessor {
       // 使用ScrapeOps代理 - 正确的API端点
       const scrapeOpsUrl = 'https://proxy.scrapeops.io/v1/';
       
+      // 对于抖音和小红书，需要特殊的爬虫配置
+      const params = {
+        'api_key': scrapeOpsApiKey,
+        'url': url,
+        'render_javascript': 'true',
+        'timeout': '30',
+        'country': 'cn'  // 使用中国IP
+      };
+      
+      // 对于抖音，增加额外的配置
+      if (siteType === 'douyin') {
+        params['render_javascript'] = 'true';
+        params['wait_for_selector'] = 'div[data-testid="video-desc"]';  // 等待视频描述加载
+      }
+      
+      // 对于小红书，增加额外的配置
+      if (siteType === 'xiaohongshu') {
+        params['render_javascript'] = 'true';
+        params['wait_for_selector'] = 'div[class*="desc"]';  // 等待描述加载
+      }
+      
       const response = await axios.get(scrapeOpsUrl, {
-        params: {
-          'api_key': scrapeOpsApiKey,
-          'url': url,
-          'render_javascript': 'true',
-          'timeout': '30'
-        },
+        params: params,
         timeout: 60000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'zh-CN,zh;q=0.9',
+          'Referer': 'https://www.douyin.com/' // 对于抖音
         }
       });
 
@@ -146,8 +164,8 @@ class AdvancedLinkProcessor {
       const siteType = this.detectSiteType(url);
       console.log(`[LinkProcessor] 检测到网站类型: ${siteType}`);
 
-      // 使用ScrapeOps获取HTML
-      const html = await this.fetchWithScrapeOps(url);
+      // 使用ScrapeOps获取HTML，传递siteType以获得特殊配置
+      const html = await this.fetchWithScrapeOps(url, siteType);
 
       let result;
       
@@ -171,10 +189,15 @@ class AdvancedLinkProcessor {
           result = await this.handleGeneric(url, html);
       }
 
-      // 验证内容
-      if (!result.content || result.content.trim().length < 10) {
-        throw new Error(`无法提取有效内容。网站类型: ${siteType}，提取的内容长度: ${result.content?.length || 0}`);
+      // 验证内容 - 即使内容很少，也继续处理而不是抛出错误
+      // 只有当完全无法提取任何内容时才抛出错误
+      if (!result.content || result.content.trim().length === 0) {
+        console.warn(`警告：无法提取任何内容。网站类型: ${siteType}`);
+        // 返回一个最小的结果，让LLM去处理
+        result.content = result.title || '无法提取内容';
       }
+      
+      console.log(`[LinkProcessor] 成功提取内容，长度: ${result.content.trim().length} 字符`);
 
       return result;
     } catch (error) {
@@ -215,14 +238,35 @@ class AdvancedLinkProcessor {
       const description = this.extractMetaContent(html, 'og:description', 'description') || '';
       const jsonLdContent = this.extractJsonLd(html);
       
+      // 尝试从HTML中提取更多内容
+      let extraContent = '';
+      
+      // 方法1: 查找video-desc相关的内容
+      const videoDescMatch = html.match(/data-testid=["']video-desc["'][^>]*>([^<]+)</i);
+      if (videoDescMatch && videoDescMatch[1]) {
+        extraContent += videoDescMatch[1] + '\n';
+      }
+      
+      // 方法2: 查找desc字段
+      const descMatch = html.match(/["']desc["']\s*:\s*["']([^"]*?)["']/i);
+      if (descMatch && descMatch[1]) {
+        extraContent += descMatch[1] + '\n';
+      }
+      
+      // 方法3: 查找content字段
+      const contentMatch = html.match(/["']content["']\s*:\s*["']([^"]*?)["']/i);
+      if (contentMatch && contentMatch[1]) {
+        extraContent += contentMatch[1] + '\n';
+      }
+      
       // 如果description为空，尝试从纯文本中提取
       let plainText = '';
-      if (!description && !jsonLdContent) {
+      if (!description && !jsonLdContent && !extraContent) {
         plainText = this.extractPlainText(html);
       }
       
       // 构建content - 优先使用title和description
-      const content = (title + '\n' + description + '\n' + jsonLdContent + '\n' + plainText)
+      const content = (title + '\n' + description + '\n' + jsonLdContent + '\n' + extraContent + '\n' + plainText)
         .split('\n')
         .filter(line => line.trim())
         .join('\n')
@@ -262,17 +306,33 @@ class AdvancedLinkProcessor {
       // 尝试从JavaScript数据中提取更多内容
       let jsContent = '';
       
-      // 方法1: 查找desc字段
-      const descMatch = html.match(/"desc":"([^"]*?)"/);
+      // 方法1: 查找desc字段（多种格式）
+      let descMatch = html.match(/["']desc["']\s*:\s*["']([^"]*?)["']/i);
       if (descMatch && descMatch[1]) {
         jsContent = descMatch[1];
       }
       
+      // 方法1b: 查找desc字段（转义引号）
+      if (!jsContent) {
+        descMatch = html.match(/\\["']desc\\["']\s*:\s*\\["']([^\\]*?)\\["']/i);
+        if (descMatch && descMatch[1]) {
+          jsContent = descMatch[1];
+        }
+      }
+      
       // 方法2: 查找content字段
       if (!jsContent) {
-        const contentMatch = html.match(/"content":"([^"]*?)"/);
+        const contentMatch = html.match(/["']content["']\s*:\s*["']([^"]*?)["']/i);
         if (contentMatch && contentMatch[1]) {
           jsContent = contentMatch[1];
+        }
+      }
+      
+      // 方法3: 查找text字段
+      if (!jsContent) {
+        const textMatch = html.match(/["']text["']\s*:\s*["']([^"]*?)["']/i);
+        if (textMatch && textMatch[1]) {
+          jsContent = textMatch[1];
         }
       }
 
