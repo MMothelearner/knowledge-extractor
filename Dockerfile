@@ -2,14 +2,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# 安装系统依赖（包括pdftotext）
-RUN apk add --no-cache poppler-utils
+# 安装系统依赖（包括pdftotext、ffmpeg、yt-dlp）
+RUN apk add --no-cache poppler-utils ffmpeg python3 py3-pip && \
+    pip3 install --no-cache-dir yt-dlp
 
 # 复制package文件
 COPY package*.json ./
 
 # 安装依赖
-RUN npm ci --production --no-optional
+RUN npm ci --production
 
 # 复制应用代码
 COPY . .

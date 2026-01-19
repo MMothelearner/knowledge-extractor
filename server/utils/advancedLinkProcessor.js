@@ -1,9 +1,11 @@
 /**
  * 高级链接处理器 - 支持多平台
- * 所有链接都通过ScrapeOps代理处理，确保最高的成功率和反爬虫处理
+ * 视频平台使用Whisper音频转录，网页使用ScrapeOps爬虫
  */
 
 const axios = require('axios');
+const videoDownloader = require('./videoDownloader');
+const whisperTranscriber = require('./whisperTranscriber');
 
 class AdvancedLinkProcessor {
   /**
@@ -156,7 +158,7 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 获取链接内容 - 所有链接都使用ScrapeOps处理
+   * 获取链接内容 - 视频使用Whisper转录，网页使用ScrapeOps
    */
   static async fetchLinkContent(url) {
     try {
@@ -164,29 +166,24 @@ class AdvancedLinkProcessor {
       const siteType = this.detectSiteType(url);
       console.log(`[LinkProcessor] 检测到网站类型: ${siteType}`);
 
-      // 使用ScrapeOps获取HTML，传递siteType以获得特殊配置
-      const html = await this.fetchWithScrapeOps(url, siteType);
-
       let result;
       
-      switch (siteType) {
-        case 'douyin':
-          result = await this.handleDouyin(url, html);
-          break;
-        case 'xiaohongshu':
-          result = await this.handleXiaohongshu(url, html);
-          break;
-        case 'youtube':
-          result = await this.handleYouTube(url, html);
-          break;
-        case 'weibo':
-          result = await this.handleWeibo(url, html);
-          break;
-        case 'bilibili':
-          result = await this.handleBilibili(url, html);
-          break;
-        default:
-          result = await this.handleGeneric(url, html);
+      // 对于视频平台，使用Whisper音频转录方案
+      if (['douyin', 'xiaohongshu', 'youtube', 'bilibili'].includes(siteType)) {
+        console.log(`[LinkProcessor] 使用Whisper音频转录方案处理视频: ${siteType}`);
+        result = await this.handleVideoWithWhisper(url, siteType);
+      } else {
+        // 对于网页，使用ScrapeOps爬虫
+        console.log(`[LinkProcessor] 使用ScrapeOps爬虫处理网页: ${siteType}`);
+        const html = await this.fetchWithScrapeOps(url, siteType);
+        
+        switch (siteType) {
+          case 'weibo':
+            result = await this.handleWeibo(url, html);
+            break;
+          default:
+            result = await this.handleGeneric(url, html);
+        }
       }
 
       // 验证内容 - 即使内容很少，也继续处理而不是抛出错误
@@ -203,6 +200,86 @@ class AdvancedLinkProcessor {
     } catch (error) {
       console.error('Error fetching link:', error.message);
       throw error;
+    }
+  }
+
+  /**
+   * 使用Whisper音频转录处理视频
+   */
+  static async handleVideoWithWhisper(url, siteType) {
+    let videoPath = null;
+    let audioPath = null;
+    
+    try {
+      console.log(`[Whisper] 开始处理视频: ${url}`);
+      
+      // 生成ID
+      const videoId = videoDownloader.generateId();
+      const audioId = `audio_${videoId}`;
+      
+      // 获取视频信息
+      const videoInfo = await videoDownloader.getVideoInfo(url);
+      console.log(`[Whisper] 视频信息: ${videoInfo.title} (${videoInfo.duration}秒)`);
+      
+      // 下载视频
+      console.log(`[Whisper] 下载视频...`);
+      videoPath = await videoDownloader.downloadVideo(url, videoId);
+      
+      // 提取音频
+      console.log(`[Whisper] 提取音频...`);
+      audioPath = await videoDownloader.extractAudio(videoPath, audioId);
+      
+      // 转录音频
+      console.log(`[Whisper] 转录音频...`);
+      const transcript = await whisperTranscriber.transcribe(audioPath, 'zh');
+      
+      // 清理临时文件
+      videoDownloader.cleanupFiles(videoPath, audioPath);
+      
+      // 构建结果
+      const result = {
+        type: `${siteType}_video`,
+        title: videoInfo.title,
+        description: videoInfo.description,
+        content: transcript,
+        url: url,
+        source: siteType,
+        duration: videoInfo.duration,
+        uploader: videoInfo.uploader,
+        transcriptionMethod: 'whisper'
+      };
+      
+      console.log(`[Whisper] 转录成功，文本长度: ${transcript.length} 字符`);
+      return result;
+    } catch (error) {
+      // 清理临时文件
+      if (videoPath || audioPath) {
+        videoDownloader.cleanupFiles(videoPath, audioPath);
+      }
+      
+      console.error(`[Whisper] 处理失败: ${error.message}`);
+      
+      // 如果Whisper方案失败，降级到ScrapeOps爬虫
+      console.log(`[Whisper] 降级到ScrapeOps爬虫...`);
+      try {
+        const html = await this.fetchWithScrapeOps(url, siteType);
+        
+        switch (siteType) {
+          case 'douyin':
+            return await this.handleDouyin(url, html);
+          case 'xiaohongshu':
+            return await this.handleXiaohongshu(url, html);
+          case 'youtube':
+            return await this.handleYouTube(url, html);
+          case 'bilibili':
+            return await this.handleBilibili(url, html);
+          default:
+            return await this.handleGeneric(url, html);
+        }
+      } catch (fallbackError) {
+        console.error(`[Whisper] 降级方案也失败: ${fallbackError.message}`);
+        throw new Error(`无法处理视频: ${error.message}。降级方案也失败: ${fallbackError.message}`);
+      }
     }
   }
 
@@ -227,7 +304,7 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 处理抖音链接
+   * 处理抖音链接（ScrapeOps爬虫方案）
    */
   static async handleDouyin(url, html) {
     try {
@@ -286,7 +363,7 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 处理小红书链接
+   * 处理小红书链接（ScrapeOps爬虫方案）
    */
   static async handleXiaohongshu(url, html) {
     try {
@@ -366,7 +443,7 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 处理YouTube链接
+   * 处理YouTube链接（ScrapeOps爬虫方案）
    */
   static async handleYouTube(url, html) {
     try {
@@ -434,7 +511,7 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 处理Bilibili链接
+   * 处理Bilibili链接（ScrapeOps爬虫方案）
    */
   static async handleBilibili(url, html) {
     try {
