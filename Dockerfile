@@ -4,7 +4,7 @@ WORKDIR /app
 
 # 安装系统依赖（包括pdftotext、ffmpeg、yt-dlp）
 RUN apk add --no-cache poppler-utils ffmpeg python3 py3-pip && \
-    pip3 install --no-cache-dir yt-dlp
+    pip3 install --no-cache-dir --break-system-packages yt-dlp
 
 # 复制package文件
 COPY package*.json ./
