@@ -114,6 +114,18 @@ router.post('/link', async (req, res) => {
     const linkContent = await AdvancedLinkProcessor.fetchLinkContent(url);
     console.log(`链接内容提取成功，内容长度: ${linkContent.content.length}`);
 
+    // 验证内容长度 - 防止LLM幻觉
+    const contentLength = linkContent.content.trim().length;
+    if (contentLength < 200) {
+      console.warn(`警告：内容过短 (${contentLength}字符)，可能无法进行有效分析`);
+      return res.status(400).json({ 
+        success: false,
+        error: `无法提取足够的内容。提取到的内容仅有 ${contentLength} 个字符，建议使用其他方式获取内容。`,
+        contentLength: contentLength,
+        suggestion: '链接可能无法被正确爬取，请尝试：1) 更新链接 2) 使用其他平台的链接 3) 手动上传文档'
+      });
+    }
+
     // 进行LLM分析
     const analysis = await processor.llmAnalyzer.analyzeContent(linkContent.content, linkContent.type);
 
