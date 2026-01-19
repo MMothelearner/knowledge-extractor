@@ -4,13 +4,19 @@ WORKDIR /app
 
 # 安装系统依赖（包括pdftotext、ffmpeg、yt-dlp）
 RUN apk add --no-cache poppler-utils ffmpeg python3 py3-pip && \
-    pip3 install --no-cache-dir --break-system-packages yt-dlp
+    python3 -m venv /opt/venv && \
+    . /opt/venv/bin/activate && \
+    pip install --no-cache-dir yt-dlp && \
+    ln -s /opt/venv/bin/yt-dlp /usr/local/bin/yt-dlp
 
 # 复制package文件
 COPY package*.json ./
 
 # 安装依赖
 RUN npm ci --production
+
+# 设置yt-dlp的PATH
+ENV PATH="/opt/venv/bin:$PATH"
 
 # 复制应用代码
 COPY . .
