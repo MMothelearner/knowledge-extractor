@@ -6,6 +6,7 @@
 const axios = require('axios');
 const videoDownloader = require('./videoDownloader');
 const whisperTranscriber = require('./whisperTranscriber');
+console.log('[AdvancedLinkProcessor] WhisperTranscriber已初始化');
 
 class AdvancedLinkProcessor {
   /**
