@@ -211,7 +211,19 @@ class AdvancedLinkProcessor {
     let audioPath = null;
     
     try {
-      console.log(`[Whisper] 开始处理视频: ${url}`);
+      console.log(`[Whisper] ========== 开始处理视频 ==========`);
+      console.log(`[Whisper] URL: ${url}`);
+      console.log(`[Whisper] 网站类型: ${siteType}`);
+      
+      // 检查依赖
+      console.log(`[Whisper] 检查系统依赖...`);
+      try {
+        videoDownloader.checkDependencies();
+        console.log(`[Whisper] 系统依赖检查通过`);
+      } catch (depError) {
+        console.error(`[Whisper] 系统依赖检查失败: ${depError.message}`);
+        throw depError;
+      }
       
       // 生成ID
       const videoId = videoDownloader.generateId();
@@ -222,15 +234,15 @@ class AdvancedLinkProcessor {
       console.log(`[Whisper] 视频信息: ${videoInfo.title} (${videoInfo.duration}秒)`);
       
       // 下载视频
-      console.log(`[Whisper] 下载视频...`);
+      console.log(`[Whisper] 步骤2: 下载视频...`);
       videoPath = await videoDownloader.downloadVideo(url, videoId);
       
       // 提取音频
-      console.log(`[Whisper] 提取音频...`);
+      console.log(`[Whisper] 步骤3: 提取音频...`);
       audioPath = await videoDownloader.extractAudio(videoPath, audioId);
       
       // 转录音频
-      console.log(`[Whisper] 转录音频...`);
+      console.log(`[Whisper] 步骤4: 转录音频...`);
       const transcript = await whisperTranscriber.transcribe(audioPath, 'zh');
       
       // 清理临时文件
@@ -258,6 +270,7 @@ class AdvancedLinkProcessor {
       }
       
       console.error(`[Whisper] 处理失败: ${error.message}`);
+      console.error(`[Whisper] 错误堆栈: ${error.stack}`);
       
       // 如果Whisper方案失败，降级到ScrapeOps爬虫
       console.log(`[Whisper] 降级到ScrapeOps爬虫...`);
