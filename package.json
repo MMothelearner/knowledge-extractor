@@ -25,22 +25,19 @@
     "express": "^4.18.0",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.11.0",
-    "yt-dlp-exec": "^1.0.0",
-    "openai": "^4.52.0",
-    "fluent-ffmpeg": "^2.1.3"
+    "openai": "^4.52.0"
   },
   "optionalDependencies": {
     "puppeteer": "^21.6.1",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "ffmpeg-static": "^5.2.0"
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1",
     "node-fetch": "^2.7.0"
   },
   "packageManager": "npm@9.0.0",
-  "notes": "系统依赖：需要在Railway上安装ffmpeg和yt-dlp。在Dockerfile中添加: RUN apt-get update && apt-get install -y ffmpeg yt-dlp",
+  "notes": "系统依赖：ffmpeg、yt-dlp、python3在Dockerfile中安装。仅使用openai npm包用于Whisper API调用。",
   "overrides": {
     "puppeteer": "$puppeteer"
   },
