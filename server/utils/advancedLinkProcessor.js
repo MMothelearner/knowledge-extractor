@@ -6,7 +6,9 @@
 const axios = require('axios');
 const videoDownloader = require('./videoDownloader');
 const whisperTranscriber = require('./whisperTranscriber');
+const DouyinApiClient = require('./douyinApiClient');
 console.log('[AdvancedLinkProcessor] WhisperTranscriber已初始化');
+const douyinApiClient = new DouyinApiClient();
 
 class AdvancedLinkProcessor {
   /**
@@ -168,6 +170,19 @@ class AdvancedLinkProcessor {
       console.log(`[LinkProcessor] 检测到网站类型: ${siteType}`);
 
       let result;
+      
+      // 对于抖音视频，优先使用Douyin API获取视频信息
+      if (siteType === 'douyin') {
+        console.log(`[LinkProcessor] 抖音视频检测，使用Douyin API处理...`);
+        try {
+          result = await this.handleDouyinWithApi(url);
+          console.log(`[LinkProcessor] Douyin API处理成功`);
+          return result;
+        } catch (apiError) {
+          console.warn(`[LinkProcessor] Douyin API处理失败: ${apiError.message}，降级到ScrapeOps...`);
+          // 降级到ScrapeOps
+        }
+      }
       
       // 使用ScrapeOps爬虫处理所有类型的链接
       console.log(`[LinkProcessor] 使用ScrapeOps爬虫处理: ${siteType}`);
@@ -597,6 +612,62 @@ class AdvancedLinkProcessor {
       };
     } catch (error) {
       throw new Error(`Bilibili链接处理失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 使用Douyin API处理抖音视频
+   */
+  static async handleDouyinWithApi(url) {
+    try {
+      console.log(`[DouyinAPI] 开始使用Douyin API处理: ${url}`);
+      
+      // 检查Douyin API服务是否可用
+      const apiUrl = process.env.DOUYIN_API_URL;
+      if (!apiUrl) {
+        throw new Error('Douyin API服务未配置 (DOUYIN_API_URL)');
+      }
+      
+      console.log(`[DouyinAPI] Douyin API服务: ${apiUrl}`);
+      
+      // 使用Douyin API获取视频信息
+      const videoInfo = await douyinApiClient.fetchVideoInfo(url);
+      
+      console.log(`[DouyinAPI] 成功获取视频信息`);
+      console.log(`  标题: ${videoInfo.title}`);
+      console.log(`  作者: ${videoInfo.author}`);
+      console.log(`  时长: ${videoInfo.duration}秒`);
+      
+      // 构建返回结果
+      const content = [
+        `标题: ${videoInfo.title}`,
+        `作者: ${videoInfo.author}`,
+        `描述: ${videoInfo.description}`,
+        `时长: ${videoInfo.duration}秒`,
+        `点赞: ${videoInfo.likeCount}`,
+        `评论: ${videoInfo.commentCount}`,
+        `分享: ${videoInfo.shareCount}`
+      ].filter(line => line.trim()).join('\n');
+      
+      return {
+        type: 'douyin_video',
+        title: videoInfo.title,
+        description: videoInfo.description,
+        content: content,
+        url: url,
+        videoId: videoInfo.videoId,
+        author: videoInfo.author,
+        duration: videoInfo.duration,
+        stats: {
+          likes: videoInfo.likeCount,
+          comments: videoInfo.commentCount,
+          shares: videoInfo.shareCount
+        },
+        source: 'douyin_api'
+      };
+    } catch (error) {
+      console.error(`[DouyinAPI] 处理失败: ${error.message}`);
+      throw new Error(`Douyin API处理失败: ${error.message}`);
     }
   }
 
