@@ -60,32 +60,59 @@ class VideoDownloader {
       // 生成输出文件路径
       const outputPath = path.join(this.tempDir, `${videoId}.%(ext)s`);
       
-      // 使用yt-dlp下载视频
-      // 优先下载最高质量的视频，但限制大小（最多500MB）
-      const command = `yt-dlp -f "best[filesize<500M]/best" -o "${outputPath}" "${url}"`;
+      // 构建yt-dlp命令，添加反爬虫对策
+      let command = `yt-dlp`;
       
-      console.log(`[VideoDownloader] 执行命令: ${command}`);
+      // 添加反爬虫参数
+      command += ` --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`;
+      command += ` --referer "https://www.douyin.com/"`;
+      command += ` --add-header "Accept-Language:zh-CN,zh;q=0.9"`;
+      
+      // 添加代理支持（如果需要）
+      if (process.env.HTTP_PROXY) {
+        command += ` --proxy "${process.env.HTTP_PROXY}"`;
+      }
+      
+      // 视频格式选择：优先下载最高质量，限制大小
+      command += ` -f "best[filesize<500M]/best"`;
+      
+      // 输出路径
+      command += ` -o "${outputPath}"`;
+      
+      // 添加重试和超时参数
+      command += ` --socket-timeout 30`;
+      command += ` --retries 3`;
+      
+      // 添加URL
+      command += ` "${url}"`;
+      
+      console.log(`[VideoDownloader] 执行yt-dlp下载...`);
       
       // 执行下载（同步）
-      execSync(command, {
+      const output = execSync(command, {
         stdio: 'pipe',
-        timeout: 300000 // 5分钟超时
+        timeout: 300000, // 5分钟超时
+        encoding: 'utf-8'
       });
+      
+      console.log(`[VideoDownloader] yt-dlp输出: ${output.substring(0, 200)}...`);
 
       // 找到下载的文件
       const files = fs.readdirSync(this.tempDir);
       const videoFile = files.find(f => f.startsWith(videoId) && !f.endsWith('.mp3'));
       
       if (!videoFile) {
-        throw new Error('视频下载失败：找不到下载的文件');
+        throw new Error('视频下载失败：找不到下载的文件。可能是yt-dlp下载失败或文件格式不符合预期。');
       }
 
       const videoPath = path.join(this.tempDir, videoFile);
-      console.log(`[VideoDownloader] 视频下载成功: ${videoPath}`);
+      const videoSize = fs.statSync(videoPath).size;
+      console.log(`[VideoDownloader] 视频下载成功: ${videoPath} (大小: ${(videoSize / 1024 / 1024).toFixed(2)}MB)`);
       
       return videoPath;
     } catch (error) {
       console.error(`[VideoDownloader] 下载失败: ${error.message}`);
+      console.error(`[VideoDownloader] 错误详情: ${error.stderr || error.stdout || ''}`);
       throw new Error(`无法下载视频: ${error.message}`);
     }
   }
@@ -100,29 +127,46 @@ class VideoDownloader {
     try {
       console.log(`[VideoDownloader] 开始提取音频: ${videoPath}`);
 
+      if (!fs.existsSync(videoPath)) {
+        throw new Error(`视频文件不存在: ${videoPath}`);
+      }
+
       const audioPath = path.join(this.tempDir, `${audioId}.mp3`);
       
       // 使用ffmpeg提取音频
-      // -q:a 5 = 中等质量（平衡大小和质量）
-      const command = `ffmpeg -i "${videoPath}" -q:a 5 -n "${audioPath}" 2>&1`;
+      // -vn: 禁用视频
+      // -acodec libmp3lame: 使用mp3编码器
+      // -ab 128k: 音频比特率
+      // -ar 16000: 采样率（Whisper优化）
+      // -ac 1: 单声道
+      // -y: 覆盖输出文件
+      const command = `ffmpeg -i "${videoPath}" -vn -acodec libmp3lame -ab 128k -ar 16000 -ac 1 -y "${audioPath}" 2>&1`;
       
-      console.log(`[VideoDownloader] 执行命令: ${command}`);
+      console.log(`[VideoDownloader] 执行ffmpeg提取音频...`);
       
-      execSync(command, {
+      const output = execSync(command, {
         stdio: 'pipe',
-        timeout: 300000 // 5分钟超时
+        timeout: 300000,
+        encoding: 'utf-8'
       });
+      
+      console.log(`[VideoDownloader] ffmpeg输出: ${output.substring(0, 200)}...`);
 
       if (!fs.existsSync(audioPath)) {
         throw new Error('音频提取失败：找不到输出文件');
       }
 
       const audioSize = fs.statSync(audioPath).size;
+      if (audioSize === 0) {
+        throw new Error('音频文件为空：ffmpeg提取失败');
+      }
+      
       console.log(`[VideoDownloader] 音频提取成功: ${audioPath} (大小: ${(audioSize / 1024 / 1024).toFixed(2)}MB)`);
       
       return audioPath;
     } catch (error) {
       console.error(`[VideoDownloader] 提取失败: ${error.message}`);
+      console.error(`[VideoDownloader] 错误详情: ${error.stderr || error.stdout || ''}`);
       throw new Error(`无法提取音频: ${error.message}`);
     }
   }
