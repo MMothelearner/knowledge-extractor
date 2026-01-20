@@ -169,22 +169,28 @@ class AdvancedLinkProcessor {
 
       let result;
       
-      // 对于视频平台，使用Whisper音频转录方案
-      if (['douyin', 'xiaohongshu', 'youtube', 'bilibili'].includes(siteType)) {
-        console.log(`[LinkProcessor] 使用Whisper音频转录方案处理视频: ${siteType}`);
-        result = await this.handleVideoWithWhisper(url, siteType);
-      } else {
-        // 对于网页，使用ScrapeOps爬虫
-        console.log(`[LinkProcessor] 使用ScrapeOps爬虫处理网页: ${siteType}`);
-        const html = await this.fetchWithScrapeOps(url, siteType);
-        
-        switch (siteType) {
-          case 'weibo':
-            result = await this.handleWeibo(url, html);
-            break;
-          default:
-            result = await this.handleGeneric(url, html);
-        }
+      // 使用ScrapeOps爬虫处理所有类型的链接
+      console.log(`[LinkProcessor] 使用ScrapeOps爬虫处理: ${siteType}`);
+      const html = await this.fetchWithScrapeOps(url, siteType);
+      
+      switch (siteType) {
+        case 'douyin':
+          result = await this.handleDouyin(url, html);
+          break;
+        case 'xiaohongshu':
+          result = await this.handleXiaohongshu(url, html);
+          break;
+        case 'youtube':
+          result = await this.handleYouTube(url, html);
+          break;
+        case 'bilibili':
+          result = await this.handleBilibili(url, html);
+          break;
+        case 'weibo':
+          result = await this.handleWeibo(url, html);
+          break;
+        default:
+          result = await this.handleGeneric(url, html);
       }
 
       // 验证内容 - 即使内容很少，也继续处理而不是抛出错误

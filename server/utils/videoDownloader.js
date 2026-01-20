@@ -67,6 +67,14 @@ class VideoDownloader {
       command += ` --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`;
       command += ` --referer "https://www.douyin.com/"`;
       command += ` --add-header "Accept-Language:zh-CN,zh;q=0.9"`;
+      command += ` --add-header "Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"`;
+      command += ` --add-header "Sec-Fetch-Dest:document"`;
+      command += ` --add-header "Sec-Fetch-Mode:navigate"`;
+      command += ` --add-header "Sec-Fetch-Site:none"`;
+      
+      // 添加抖音专用参数
+      command += ` --no-check-certificate`;
+      command += ` --no-warnings`;
       
       // 添加代理支持（如果需要）
       if (process.env.HTTP_PROXY) {
@@ -82,6 +90,7 @@ class VideoDownloader {
       // 添加重试和超时参数
       command += ` --socket-timeout 30`;
       command += ` --retries 3`;
+      command += ` --fragment-retries 3`;
       
       // 添加URL
       command += ` "${url}"`;
