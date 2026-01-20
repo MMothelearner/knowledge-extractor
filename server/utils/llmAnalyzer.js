@@ -94,7 +94,7 @@ class LLMAnalyzer {
 
 输出格式（必须严格按照）：
 
-## [时间戳] 章节标题
+## 章节标题
 - **核心论点**：一句话概括
 - **关键细节**：
   - [概念/方法]：具体解释
@@ -134,14 +134,12 @@ ${content}
     try {
       // 提取章节
       const sections = [];
-      const sectionRegex = /^##\s+\[([^\]]+)\]\s+(.+)$/gm;
+      const sectionRegex = /^##\s+(.+?)$/gm;
       let match;
 
       while ((match = sectionRegex.exec(response)) !== null) {
-        const timeRange = match[1];
-        const title = match[2];
+        const title = match[1];
         sections.push({
-          timeRange,
           title,
           content: ''
         });
