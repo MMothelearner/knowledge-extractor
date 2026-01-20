@@ -114,19 +114,15 @@ router.post('/link', async (req, res) => {
     const linkContent = await AdvancedLinkProcessor.fetchLinkContent(url);
     console.log(`链接内容提取成功，内容长度: ${linkContent.content.length}`);
 
-    // 验证内容长度 - 防止LLM幻觉
+    // 即使内容很少也继续处理 - 让LLM去判断内容是否足够
     const contentLength = linkContent.content.trim().length;
-    if (contentLength < 200) {
-      console.warn(`警告：内容过短 (${contentLength}字符)，可能无法进行有效分析`);
-      return res.status(400).json({ 
-        success: false,
-        error: `无法提取足够的内容。提取到的内容仅有 ${contentLength} 个字符，建议使用其他方式获取内容。`,
-        contentLength: contentLength,
-        suggestion: '链接可能无法被正确爬取，请尝试：1) 更新链接 2) 使用其他平台的链接 3) 手动上传文档'
-      });
+    if (contentLength > 0) {
+      console.log(`内容长度: ${contentLength}字符，继续进行LLM分析`);
+    } else {
+      console.warn(`警告：无法提取任何内容`);
     }
 
-    // 进行LLM分析
+    // 进行LLM分析 - 无论内容多少都进行分析
     const analysis = await processor.llmAnalyzer.analyzeContent(linkContent.content, linkContent.type);
 
     const result = {
