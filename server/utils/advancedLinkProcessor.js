@@ -6,9 +6,9 @@
 const axios = require('axios');
 const videoDownloader = require('./videoDownloader');
 const whisperTranscriber = require('./whisperTranscriber');
-const DouyinApiClient = require('./douyinApiClient');
+const DouyinCrawlerWrapper = require('./douyinCrawlerWrapper');
 console.log('[AdvancedLinkProcessor] WhisperTranscriber已初始化');
-const douyinApiClient = new DouyinApiClient();
+const douyinCrawler = new DouyinCrawlerWrapper();
 
 class AdvancedLinkProcessor {
   /**
@@ -616,24 +616,20 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 使用Douyin API处理抖音视频
+   * 使用Douyin爬虫处理抖音视频
    */
   static async handleDouyinWithApi(url) {
     try {
-      console.log(`[DouyinAPI] 开始使用Douyin API处理: ${url}`);
+      console.log(`[DouyinCrawler] 开始使用Douyin爬虫处理: ${url}`);
       
-      // 检查Douyin API服务是否可用
-      const apiUrl = process.env.DOUYIN_API_URL;
-      if (!apiUrl) {
-        throw new Error('Douyin API服务未配置 (DOUYIN_API_URL)');
+      // 使用Douyin爬虫获取视频信息
+      const videoInfo = await douyinCrawler.fetchVideoInfo(url);
+      
+      if (!videoInfo.success) {
+        throw new Error(videoInfo.error || '爬虫失败');
       }
       
-      console.log(`[DouyinAPI] Douyin API服务: ${apiUrl}`);
-      
-      // 使用Douyin API获取视频信息
-      const videoInfo = await douyinApiClient.fetchVideoInfo(url);
-      
-      console.log(`[DouyinAPI] 成功获取视频信息`);
+      console.log(`[DouyinCrawler] 成功获取视频信息`);
       console.log(`  标题: ${videoInfo.title}`);
       console.log(`  作者: ${videoInfo.author}`);
       console.log(`  时长: ${videoInfo.duration}秒`);
@@ -644,9 +640,9 @@ class AdvancedLinkProcessor {
         `作者: ${videoInfo.author}`,
         `描述: ${videoInfo.description}`,
         `时长: ${videoInfo.duration}秒`,
-        `点赞: ${videoInfo.likeCount}`,
-        `评论: ${videoInfo.commentCount}`,
-        `分享: ${videoInfo.shareCount}`
+        `点赞: ${videoInfo.like_count}`,
+        `评论: ${videoInfo.comment_count}`,
+        `分享: ${videoInfo.share_count}`
       ].filter(line => line.trim()).join('\n');
       
       return {
@@ -655,19 +651,19 @@ class AdvancedLinkProcessor {
         description: videoInfo.description,
         content: content,
         url: url,
-        videoId: videoInfo.videoId,
+        videoId: videoInfo.video_id,
         author: videoInfo.author,
         duration: videoInfo.duration,
         stats: {
-          likes: videoInfo.likeCount,
-          comments: videoInfo.commentCount,
-          shares: videoInfo.shareCount
+          likes: videoInfo.like_count,
+          comments: videoInfo.comment_count,
+          shares: videoInfo.share_count
         },
-        source: 'douyin_api'
+        source: 'douyin_crawler'
       };
     } catch (error) {
-      console.error(`[DouyinAPI] 处理失败: ${error.message}`);
-      throw new Error(`Douyin API处理失败: ${error.message}`);
+      console.error(`[DouyinCrawler] 处理失败: ${error.message}`);
+      throw new Error(`Douyin爬虫处理失败: ${error.message}`);
     }
   }
 
