@@ -27,6 +27,7 @@ class TikHubApiClient {
         /v\.douyin\.com\/([A-Za-z0-9]+)/,
         /douyin\.com\/video\/(\d+)/,
         /douyin\.com\/share\/video\/(\d+)/,
+        /aweme\/v1\/feed.*video_id=([\d]+)/,
       ];
 
       for (const pattern of patterns) {
@@ -38,7 +39,58 @@ class TikHubApiClient {
 
       return null;
     } catch (error) {
-      logger.error('Error extracting video ID:', error);
+      console.error('[TikHub] Error extracting video ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 处理短链接重定向，获取真实的视频ID
+   */
+  async resolveShortLink(shortUrl) {
+    try {
+      console.log(`[TikHub] Resolving short link: ${shortUrl}`);
+      
+      // 首先尝试使用TikHub API的短链接解析端点
+      try {
+        const response = await this.client.get('/douyin/web/v1/resolve_url', {
+          params: {
+            url: shortUrl,
+          },
+        });
+
+        if (response.data && response.data.video_id) {
+          console.log(`[TikHub] Resolved video ID via API: ${response.data.video_id}`);
+          return response.data.video_id;
+        }
+      } catch (apiError) {
+        console.log('[TikHub] TikHub API解析失败，尝试HTTP重定向...');
+      }
+
+      // 如果API解析失败，尝试HTTP重定向
+      try {
+        const redirectResponse = await axios.head(shortUrl, {
+          maxRedirects: 5,
+          timeout: 10000,
+          validateStatus: () => true,
+        });
+
+        if (redirectResponse.request && redirectResponse.request.path) {
+          const redirectUrl = redirectResponse.request.path;
+          console.log(`[TikHub] Redirected path: ${redirectUrl}`);
+          const videoId = this.extractVideoId(redirectUrl);
+          if (videoId) {
+            console.log(`[TikHub] Extracted video ID from redirect: ${videoId}`);
+            return videoId;
+          }
+        }
+      } catch (redirectError) {
+        console.log('[TikHub] HTTP重定向失败:', redirectError.message);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[TikHub] Error resolving short link:', error.message);
       return null;
     }
   }
@@ -76,7 +128,17 @@ class TikHubApiClient {
     try {
       console.log(`[TikHub] Processing Douyin URL: ${url}`);
 
-      const videoId = this.extractVideoId(url);
+      let videoId = this.extractVideoId(url);
+      
+      // 如果是短链接（v.douyin.com），需要解析重定向
+      if (url.includes('v.douyin.com') && videoId && videoId.length < 20) {
+        console.log('[TikHub] Detected short link, attempting to resolve...');
+        const resolvedId = await this.resolveShortLink(url);
+        if (resolvedId) {
+          videoId = resolvedId;
+        }
+      }
+      
       if (!videoId) {
         console.error('[TikHub] Failed to extract video ID from URL');
         return {
@@ -85,7 +147,7 @@ class TikHubApiClient {
         };
       }
 
-      console.log(`[TikHub] Extracted video ID: ${videoId}`);
+      console.log(`[TikHub] Using video ID: ${videoId}`);
 
       const videoInfo = await this.fetchVideoInfo(videoId);
       if (!videoInfo) {
