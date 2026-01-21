@@ -7,8 +7,10 @@ const axios = require('axios');
 const videoDownloader = require('./videoDownloader');
 const whisperTranscriber = require('./whisperTranscriber');
 const DouyinCrawlerWrapper = require('./douyinCrawlerWrapper');
+const TikHubApiClient = require('./tikHubApiClient');
 console.log('[AdvancedLinkProcessor] WhisperTranscriber已初始化');
 const douyinCrawler = new DouyinCrawlerWrapper();
+const tikHubClient = new TikHubApiClient(process.env.TIKHUB_API_KEY);
 
 class AdvancedLinkProcessor {
   /**
@@ -620,16 +622,20 @@ class AdvancedLinkProcessor {
    */
   static async handleDouyinWithApi(url) {
     try {
-      console.log(`[DouyinCrawler] 开始使用Douyin爬虫处理: ${url}`);
+      console.log(`[TikHub] 开始使用TikHub API处理抖音链接: ${url}`);
       
-      // 使用Douyin爬虫获取视频信息
-      const videoInfo = await douyinCrawler.fetchVideoInfo(url);
-      
-      if (!videoInfo.success) {
-        throw new Error(videoInfo.error || '爬虫失败');
+      if (!process.env.TIKHUB_API_KEY) {
+        throw new Error('TikHub API密钥未配置');
       }
       
-      console.log(`[DouyinCrawler] 成功获取视频信息`);
+      // 使用TikHub API获取视频信息
+      const videoInfo = await tikHubClient.getVideoFromUrl(url);
+      
+      if (!videoInfo.success) {
+        throw new Error(videoInfo.error || 'TikHub API调用失败');
+      }
+      
+      console.log(`[TikHub] 成功获取视频信息`);
       console.log(`  标题: ${videoInfo.title}`);
       console.log(`  作者: ${videoInfo.author}`);
       console.log(`  时长: ${videoInfo.duration}秒`);
@@ -640,9 +646,10 @@ class AdvancedLinkProcessor {
         `作者: ${videoInfo.author}`,
         `描述: ${videoInfo.description}`,
         `时长: ${videoInfo.duration}秒`,
-        `点赞: ${videoInfo.like_count}`,
-        `评论: ${videoInfo.comment_count}`,
-        `分享: ${videoInfo.share_count}`
+        `点赞: ${videoInfo.likes}`,
+        `评论: ${videoInfo.comments}`,
+        `分享: ${videoInfo.shares}`,
+        `浏览: ${videoInfo.views}`
       ].filter(line => line.trim()).join('\n');
       
       return {
@@ -651,25 +658,22 @@ class AdvancedLinkProcessor {
         description: videoInfo.description,
         content: content,
         url: url,
-        videoId: videoInfo.video_id,
+        videoId: videoInfo.videoId,
         author: videoInfo.author,
         duration: videoInfo.duration,
         stats: {
-          likes: videoInfo.like_count,
-          comments: videoInfo.comment_count,
-          shares: videoInfo.share_count
+          likes: videoInfo.likes,
+          comments: videoInfo.comments,
+          shares: videoInfo.shares,
+          views: videoInfo.views
         },
-        source: 'douyin_crawler'
+        source: 'tikhub_api'
       };
     } catch (error) {
-      console.error(`[DouyinCrawler] 处理失败: ${error.message}`);
-      throw new Error(`Douyin爬虫处理失败: ${error.message}`);
+      console.error(`[TikHub] 处理失败: ${error.message}`);
+      throw new Error(`TikHub API处理失败: ${error.message}`);
     }
   }
-
-  /**
-   * 处理通用网页
-   */
   static async handleGeneric(url, html) {
     try {
       const title = this.extractMetaContent(html, 'og:title') || 
