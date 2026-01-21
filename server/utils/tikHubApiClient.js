@@ -104,7 +104,7 @@ class TikHubApiClient {
 
       const response = await this.client.get('/douyin/app/v3/fetch_one_video', {
         params: {
-          video_id: videoId,
+          aweme_id: videoId,
         },
       });
 
