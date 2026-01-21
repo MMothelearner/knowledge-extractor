@@ -108,9 +108,10 @@ class TikHubApiClient {
         },
       });
 
-      if (response.status === 200 && response.data) {
+      if (response.status === 200 && response.data && response.data.data && response.data.data.aweme_detail) {
         console.log(`[TikHub] Successfully fetched video info for video ID: ${videoId}`);
-        return response.data;
+        // TikHub API返回的实际视频数据在 response.data.data.aweme_detail 中
+        return response.data.data.aweme_detail;
       } else {
         console.error(`[TikHub] Failed to fetch video info: ${response.status}`);
         return null;
@@ -160,12 +161,12 @@ class TikHubApiClient {
       const result = {
         success: true,
         videoId: videoId,
-        title: videoInfo.title || videoInfo.desc || 'Untitled',
+        title: videoInfo.desc || 'Untitled',
         description: videoInfo.desc || '',
         author: videoInfo.author?.nickname || 'Unknown',
-        duration: videoInfo.duration || 0,
-        playUrl: videoInfo.play_addr?.url_list?.[0] || videoInfo.video?.download_addr || null,
-        coverUrl: videoInfo.cover?.url_list?.[0] || videoInfo.dynamic_cover?.url_list?.[0] || null,
+        duration: Math.floor((videoInfo.duration || 0) / 1000),
+        playUrl: videoInfo.video?.play_addr?.url_list?.[0] || null,
+        coverUrl: videoInfo.video?.cover?.url_list?.[0] || videoInfo.dynamic_cover?.url_list?.[0] || null,
         likes: videoInfo.statistics?.digg_count || 0,
         comments: videoInfo.statistics?.comment_count || 0,
         shares: videoInfo.statistics?.share_count || 0,
