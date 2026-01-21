@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Link = require('../models/Link');
-const LinkProcessor = require('../utils/linkProcessor');
+const AdvancedLinkProcessor = require('../utils/advancedLinkProcessor');
 const Deduplicator = require('../utils/deduplicator');
 const KnowledgePoint = require('../models/KnowledgePoint');
 
@@ -19,7 +19,7 @@ router.post('/submit', async (req, res) => {
       });
     }
 
-    if (!LinkProcessor.isValidUrl(url)) {
+      if (!AdvancedLinkProcessor.isValidUrl(url)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid URL'
@@ -38,10 +38,10 @@ router.post('/submit', async (req, res) => {
     setImmediate(async () => {
       try {
         // 第一步：获取链接内容
-        const content = await LinkProcessor.fetchLinkContent(url);
+        const content = await AdvancedLinkProcessor.fetchLinkContent(url);
         
         // 第二步：使用LLM分析内容
-        const llmAnalysis = await LinkProcessor.analyzeLinkWithLLM(content);
+        const llmAnalysis = await AdvancedLinkProcessor.analyzeLinkWithLLM(content);
         
         // 第三步：从分析结果中提取知识点
         const knowledge = [];

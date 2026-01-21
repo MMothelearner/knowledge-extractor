@@ -7,6 +7,7 @@ const axios = require('axios');
 const videoDownloader = require('./videoDownloader');
 const whisperTranscriber = require('./whisperTranscriber');
 const TikHubApiClient = require('./tikHubApiClient');
+const LLMAnalyzer = require('./llmAnalyzer');
 
 console.log('[AdvancedLinkProcessor] 模块初始化');
 console.log('[AdvancedLinkProcessor] TIKHUB_API_KEY状态:', process.env.TIKHUB_API_KEY ? '已配置' : '未配置');
@@ -721,6 +722,56 @@ class AdvancedLinkProcessor {
       };
     } catch (error) {
       throw new Error(`网页处理失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 使用LLM分析链接内容
+   */
+  static async analyzeLinkWithLLM(linkContent) {
+    try {
+      const analyzer = new LLMAnalyzer();
+      const analysis = await analyzer.analyzeContent(linkContent.content, 'link');
+      
+      // 转换为LLM分析结果格式
+      return {
+        title: linkContent.title,
+        summary: analysis.summary || '',
+        keyPoints: analysis.keywords || [],
+        problems: analysis.problem ? [{
+          problem: analysis.problem,
+          solutions: analysis.methods || []
+        }] : [],
+        learningNotes: analysis.methods || [],
+        tags: analysis.keywords || [],
+        difficulty: '中等',
+        mindmap: analysis.mindmap || '',
+        rawAnalysis: analysis
+      };
+    } catch (error) {
+      console.error('Error analyzing link with LLM:', error);
+      // 返回默认分析结果而不是抛出错误
+      return {
+        title: linkContent.title,
+        summary: '内容分析中...',
+        keyPoints: [],
+        problems: [],
+        learningNotes: [],
+        tags: [],
+        difficulty: '中等'
+      };
+    }
+  }
+
+  /**
+   * 验证URL
+   */
+  static isValidUrl(url) {
+    try {
+      new URL(url);
+      return true;
+    } catch (error) {
+      return false;
     }
   }
 }
