@@ -81,13 +81,13 @@ class SmartDocumentProcessor {
    */
   async processLink(url) {
     try {
-      const LinkProcessor = require('./linkProcessor');
+      const AdvancedLinkProcessor = require('./advancedLinkProcessor');
       
       // 1. 获取链接内容
-      const linkContent = await LinkProcessor.fetchLinkContent(url);
+      const linkContent = await AdvancedLinkProcessor.fetchLinkContent(url);
       
       // 2. 使用LLM分析链接内容
-      const analysis = await LinkProcessor.analyzeLinkWithLLM(linkContent);
+      const analysis = await AdvancedLinkProcessor.analyzeLinkWithLLM(linkContent);
       
       // 3. 返回结构化结果
       return {
