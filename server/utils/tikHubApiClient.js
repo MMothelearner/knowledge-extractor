@@ -1,5 +1,4 @@
 const axios = require('axios');
-const logger = require('../_core/logger');
 
 /**
  * TikHub API客户端
@@ -49,7 +48,7 @@ class TikHubApiClient {
    */
   async fetchVideoInfo(videoId) {
     try {
-      logger.info(`Fetching video info from TikHub for video ID: ${videoId}`);
+      console.log(`[TikHub] Fetching video info for video ID: ${videoId}`);
 
       const response = await this.client.get('/douyin/app/v3/fetch_one_video', {
         params: {
@@ -58,14 +57,14 @@ class TikHubApiClient {
       });
 
       if (response.status === 200 && response.data) {
-        logger.info(`Successfully fetched video info for video ID: ${videoId}`);
+        console.log(`[TikHub] Successfully fetched video info for video ID: ${videoId}`);
         return response.data;
       } else {
-        logger.error(`Failed to fetch video info: ${response.status}`);
+        console.error(`[TikHub] Failed to fetch video info: ${response.status}`);
         return null;
       }
     } catch (error) {
-      logger.error('Error fetching video info from TikHub:', error.message);
+      console.error('[TikHub] Error fetching video info:', error.message);
       return null;
     }
   }
@@ -75,18 +74,18 @@ class TikHubApiClient {
    */
   async getVideoFromUrl(url) {
     try {
-      logger.info(`Processing Douyin URL: ${url}`);
+      console.log(`[TikHub] Processing Douyin URL: ${url}`);
 
       const videoId = this.extractVideoId(url);
       if (!videoId) {
-        logger.error('Failed to extract video ID from URL');
+        console.error('[TikHub] Failed to extract video ID from URL');
         return {
           success: false,
           error: 'Failed to extract video ID from URL',
         };
       }
 
-      logger.info(`Extracted video ID: ${videoId}`);
+      console.log(`[TikHub] Extracted video ID: ${videoId}`);
 
       const videoInfo = await this.fetchVideoInfo(videoId);
       if (!videoInfo) {
@@ -112,10 +111,10 @@ class TikHubApiClient {
         rawData: videoInfo,
       };
 
-      logger.info(`Successfully extracted video info: ${result.title}`);
+      console.log(`[TikHub] Successfully extracted video info: ${result.title}`);
       return result;
     } catch (error) {
-      logger.error('Error in getVideoFromUrl:', error.message);
+      console.error('[TikHub] Error in getVideoFromUrl:', error.message);
       return {
         success: false,
         error: error.message,
