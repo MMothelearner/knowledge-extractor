@@ -6,11 +6,27 @@
 const axios = require('axios');
 const videoDownloader = require('./videoDownloader');
 const whisperTranscriber = require('./whisperTranscriber');
-const DouyinCrawlerWrapper = require('./douyinCrawlerWrapper');
 const TikHubApiClient = require('./tikHubApiClient');
-console.log('[AdvancedLinkProcessor] WhisperTranscriber已初始化');
-const douyinCrawler = new DouyinCrawlerWrapper();
-const tikHubClient = new TikHubApiClient(process.env.TIKHUB_API_KEY);
+
+console.log('[AdvancedLinkProcessor] 模块初始化');
+console.log('[AdvancedLinkProcessor] TIKHUB_API_KEY状态:', process.env.TIKHUB_API_KEY ? '已配置' : '未配置');
+
+// 延迟初始化TikHub客户端 - 在需要时才创建
+let tikHubClient = null;
+
+function getTikHubClient() {
+  if (!tikHubClient) {
+    const apiKey = process.env.TIKHUB_API_KEY;
+    if (!apiKey) {
+      console.error('[TikHub] TIKHUB_API_KEY环境变量未配置！');
+      return null;
+    }
+    console.log('[TikHub] 初始化TikHub客户端...');
+    tikHubClient = new TikHubApiClient(apiKey);
+    console.log('[TikHub] TikHub客户端已初始化');
+  }
+  return tikHubClient;
+}
 
 class AdvancedLinkProcessor {
   /**
@@ -625,11 +641,19 @@ class AdvancedLinkProcessor {
       console.log(`[TikHub] 开始使用TikHub API处理抖音链接: ${url}`);
       
       if (!process.env.TIKHUB_API_KEY) {
+        console.error('[TikHub] TIKHUB_API_KEY环境变量未配置');
         throw new Error('TikHub API密钥未配置');
       }
       
+      // 获取或初始化TikHub客户端
+      const client = getTikHubClient();
+      if (!client) {
+        throw new Error('无法初始化TikHub客户端');
+      }
+      
+      console.log('[TikHub] 调用TikHub API...');
       // 使用TikHub API获取视频信息
-      const videoInfo = await tikHubClient.getVideoFromUrl(url);
+      const videoInfo = await client.getVideoFromUrl(url);
       
       if (!videoInfo.success) {
         throw new Error(videoInfo.error || 'TikHub API调用失败');
