@@ -146,7 +146,7 @@ class AdvancedLinkProcessor {
       };
       
       // 对于抖音，增加额外的配置
-      if (siteType === 'douyin') {
+      if (['douyin', 'xiaohongshu', 'bilibili', 'youtube', 'weibo', 'tiktok'].includes(siteType)) {
         params['render_javascript'] = 'true';
         params['wait_for_selector'] = 'div[data-testid="video-desc"]';  // 等待视频描述加载
       }
@@ -191,14 +191,14 @@ class AdvancedLinkProcessor {
       let result;
       
       // 对于抖音视频，优先使用Douyin API获取视频信息
-      if (siteType === 'douyin') {
-        console.log(`[LinkProcessor] 抖音视频检测，使用Douyin API处理...`);
+      if (['douyin', 'xiaohongshu', 'bilibili', 'youtube', 'weibo', 'tiktok'].includes(siteType)) {
+        console.log(`[LinkProcessor] 视频平台检测，使用TikHub API + Whisper处理...`);
         try {
-          result = await this.handleDouyinWithApi(url);
-          console.log(`[LinkProcessor] Douyin API处理成功`);
+          result = await this.handleVideoWithTikHubAndWhisper(url);
+          console.log(`[LinkProcessor] TikHub API + Whisper处理成功`);
           return result;
         } catch (apiError) {
-          console.warn(`[LinkProcessor] Douyin API处理失败: ${apiError.message}，降级到ScrapeOps...`);
+          console.warn(`[LinkProcessor] TikHub API + Whisper处理失败: ${apiError.message}，降级到ScrapeOps...`);
           // 降级到ScrapeOps
         }
       }
@@ -635,7 +635,177 @@ class AdvancedLinkProcessor {
   }
 
   /**
-   * 使用Douyin爬虫处理抖音视频
+   * 使用TikHub API + Whisper处理多平台视频
+   * 支持：抖音、小红书、B站、YouTube、微博、TikTok
+   */
+  static async handleVideoWithTikHubAndWhisper(url) {
+    let videoPath = null;
+    let audioPath = null;
+
+    try {
+      console.log(`[TikHub+Whisper] ========== 开始处理视频 ==========`);
+      console.log(`[TikHub+Whisper] URL: ${url}`);
+
+      // 检查依赖
+      console.log(`[TikHub+Whisper] 检查系统依赖...`);
+      try {
+        videoDownloader.checkDependencies();
+        console.log(`[TikHub+Whisper] 系统依赖检查通过`);
+      } catch (depError) {
+        console.error(`[TikHub+Whisper] 系统依赖检查失败: ${depError.message}`);
+        throw depError;
+      }
+
+      // 第1步：使用TikHub API获取视频信息
+      console.log(`[TikHub+Whisper] 步骤1: 使用TikHub API获取视频信息...`);
+      
+      if (!process.env.TIKHUB_API_KEY) {
+        throw new Error('TikHub API密钥未配置');
+      }
+
+      const client = getTikHubClient();
+      if (!client) {
+        throw new Error('无法初始化TikHub客户端');
+      }
+
+      const videoInfo = await client.getVideoFromUrl(url);
+      if (!videoInfo.success) {
+        throw new Error(videoInfo.error || 'TikHub API调用失败');
+      }
+
+      console.log(`[TikHub+Whisper] 成功获取视频信息`);
+      console.log(`  平台: ${videoInfo.platform}`);
+      console.log(`  标题: ${videoInfo.title}`);
+      console.log(`  作者: ${videoInfo.author}`);
+      console.log(`  时长: ${videoInfo.duration}秒`);
+
+      // 第2步：获取播放URL
+      const playUrl = videoInfo.playUrl;
+      if (!playUrl) {
+        console.warn(`[TikHub+Whisper] 无法获取播放URL，将使用元数据进行分析`);
+        // 如果无法获取播放URL，返回基于元数据的分析
+        return this.buildVideoResultFromMetadata(videoInfo);
+      }
+
+      // 第3步：下载视频
+      console.log(`[TikHub+Whisper] 步骤2: 下载视频...`);
+      const videoId = videoDownloader.generateId();
+      const audioId = `${videoId}_audio`;
+      videoPath = await videoDownloader.downloadVideo(playUrl, videoId);
+
+      // 第4步：提取音频
+      console.log(`[TikHub+Whisper] 步骤3: 提取音频...`);
+      audioPath = await videoDownloader.extractAudio(videoPath, audioId);
+
+      // 第5步：Whisper转录
+      console.log(`[TikHub+Whisper] 步骤4: Whisper转录音频...`);
+      const transcription = await videoDownloader.transcribeAudio(audioPath);
+
+      // 清理临时文件
+      videoDownloader.cleanupFiles(videoPath, audioPath);
+
+      // 构建结果
+      const content = [
+        `标题: ${videoInfo.title}`,
+        `作者: ${videoInfo.author}`,
+        `描述: ${videoInfo.description}`,
+        `时长: ${videoInfo.duration}秒`,
+        `点赞: ${videoInfo.likes}`,
+        `评论: ${videoInfo.comments}`,
+        `分享: ${videoInfo.shares}`,
+        `浏览: ${videoInfo.views}`,
+        `\n=== 音频转录内容 ===\n`,
+        transcription
+      ].filter(line => line.trim()).join('\n');
+
+      console.log(`[TikHub+Whisper] 转录成功，文本长度: ${transcription.length} 字符`);
+
+      return {
+        type: `${videoInfo.platform}_video`,
+        title: videoInfo.title,
+        description: videoInfo.description,
+        content: content,
+        url: url,
+        videoId: videoInfo.id,
+        author: videoInfo.author,
+        duration: videoInfo.duration,
+        platform: videoInfo.platform,
+        stats: {
+          likes: videoInfo.likes,
+          comments: videoInfo.comments,
+          shares: videoInfo.shares,
+          views: videoInfo.views
+        },
+        transcription: transcription,
+        transcriptionMethod: 'whisper',
+        source: 'tikhub_whisper'
+      };
+    } catch (error) {
+      // 清理临时文件
+      if (videoPath || audioPath) {
+        videoDownloader.cleanupFiles(videoPath, audioPath);
+      }
+
+      console.error(`[TikHub+Whisper] 处理失败: ${error.message}`);
+      console.error(`[TikHub+Whisper] 错误堆栈: ${error.stack}`);
+
+      // 如果Whisper方案失败，尝试使用元数据分析
+      console.log(`[TikHub+Whisper] 降级到元数据分析...`);
+      try {
+        const client = getTikHubClient();
+        if (client) {
+          const videoInfo = await client.getVideoFromUrl(url);
+          if (videoInfo.success) {
+            return this.buildVideoResultFromMetadata(videoInfo);
+          }
+        }
+      } catch (fallbackError) {
+        console.error(`[TikHub+Whisper] 降级方案也失败: ${fallbackError.message}`);
+      }
+
+      throw new Error(`无法处理视频: ${error.message}`);
+    }
+  }
+
+  /**
+   * 从视频元数据构建分析结果
+   */
+  static buildVideoResultFromMetadata(videoInfo) {
+    const content = [
+      `标题: ${videoInfo.title}`,
+      `作者: ${videoInfo.author}`,
+      `描述: ${videoInfo.description}`,
+      `时长: ${videoInfo.duration}秒`,
+      `点赞: ${videoInfo.likes}`,
+      `评论: ${videoInfo.comments}`,
+      `分享: ${videoInfo.shares}`,
+      `浏览: ${videoInfo.views}`
+    ].filter(line => line.trim()).join('\n');
+
+    return {
+      type: `${videoInfo.platform}_video`,
+      title: videoInfo.title,
+      description: videoInfo.description,
+      content: content,
+      url: videoInfo.url,
+      videoId: videoInfo.id,
+      author: videoInfo.author,
+      duration: videoInfo.duration,
+      platform: videoInfo.platform,
+      stats: {
+        likes: videoInfo.likes,
+        comments: videoInfo.comments,
+        shares: videoInfo.shares,
+        views: videoInfo.views
+      },
+      transcription: null,
+      transcriptionMethod: 'metadata',
+      source: 'tikhub_metadata'
+    };
+  }
+
+  /**
+   * 使用Douyin爬虫处理抖音视频 (已弃用，保留用于兼容性)
    */
   static async handleDouyinWithApi(url) {
     try {

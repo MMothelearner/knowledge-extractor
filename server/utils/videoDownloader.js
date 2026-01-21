@@ -244,3 +244,94 @@ class VideoDownloader {
 }
 
 module.exports = new VideoDownloader();
+
+
+// 在module.exports之前添加Whisper转录功能
+VideoDownloader.prototype.transcribeAudio = async function(audioPath) {
+  try {
+    console.log(`[VideoDownloader] 开始Whisper转录: ${audioPath}`);
+
+    if (!fs.existsSync(audioPath)) {
+      throw new Error(`音频文件不存在: ${audioPath}`);
+    }
+
+    // 检查OpenAI API密钥
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('缺少OPENAI_API_KEY环境变量');
+    }
+
+    // 使用FormData上传文件
+    const FormData = require('form-data');
+    const form = new FormData();
+    form.append('file', fs.createReadStream(audioPath));
+    form.append('model', 'whisper-1');
+    form.append('language', 'zh'); // 优先识别中文
+
+    // 调用OpenAI Whisper API
+    const response = await axios.post(
+      'https://api.openai.com/v1/audio/transcriptions',
+      form,
+      {
+        headers: {
+          ...form.getHeaders(),
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        timeout: 600000, // 10分钟超时
+      }
+    );
+
+    if (!response.data || !response.data.text) {
+      throw new Error('Whisper API返回无效响应');
+    }
+
+    const transcription = response.data.text;
+    console.log(`[VideoDownloader] Whisper转录成功，文本长度: ${transcription.length}`);
+    console.log(`[VideoDownloader] 转录文本预览: ${transcription.substring(0, 100)}...`);
+
+    return transcription;
+  } catch (error) {
+    console.error(`[VideoDownloader] Whisper转录失败: ${error.message}`);
+    throw new Error(`无法转录音频: ${error.message}`);
+  }
+};
+
+// 完整的视频处理流程：下载 -> 提取音频 -> Whisper转录
+VideoDownloader.prototype.processVideoComplete = async function(videoUrl) {
+  let videoPath = null;
+  let audioPath = null;
+
+  try {
+    console.log(`[VideoDownloader] 开始完整视频处理流程: ${videoUrl}`);
+
+    const videoId = this.generateId();
+    const audioId = `${videoId}_audio`;
+
+    // 第1步：下载视频
+    videoPath = await this.downloadVideo(videoUrl, videoId);
+
+    // 第2步：提取音频
+    audioPath = await this.extractAudio(videoPath, audioId);
+
+    // 第3步：Whisper转录
+    const transcription = await this.transcribeAudio(audioPath);
+
+    console.log(`[VideoDownloader] 完整视频处理流程完成`);
+
+    return {
+      success: true,
+      transcription: transcription,
+      videoId: videoId,
+      audioId: audioId,
+    };
+  } catch (error) {
+    console.error(`[VideoDownloader] 完整视频处理流程失败: ${error.message}`);
+    return {
+      success: false,
+      error: error.message,
+    };
+  } finally {
+    // 清理临时文件
+    this.cleanupFiles(videoPath, audioPath);
+  }
+};
